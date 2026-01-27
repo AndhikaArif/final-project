@@ -1,0 +1,178 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  TENANT
+}
+
+enum VerificationStatus {
+  PENDING
+  VERIFIED
+}
+
+model User {
+  id                 String             @id @default(uuid())
+  name               String
+  email              String             @unique
+  password           String?
+  role               Role
+  verificationStatus VerificationStatus @default(PENDING)
+
+  profileImage String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  verificationToken  VerificationToken?
+  resetPasswordToken ResetPasswordToken?
+
+  tenant  Tenant?
+  reviews Review[]
+
+  @@map("users")
+}
+
+model VerificationToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  expiredAt DateTime
+
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("verification_tokens")
+}
+
+model ResetPasswordToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  expiredAt DateTime
+
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("reset_password_tokens")
+}
+
+model Tenant {
+  id     String @id @default(uuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  properties Property[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("tenants")
+}
+
+model PropertyCategory {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  properties Property[]
+
+  @@map("property_categories")
+}
+
+model Property {
+  id         String @id @default(uuid())
+  tenantId   String
+  categoryId String
+
+  name        String
+  description String
+  address     String
+  city        String
+  image       String
+  maxGuest    Int
+
+  tenant   Tenant           @relation(fields: [tenantId], references: [id])
+  category PropertyCategory @relation(fields: [categoryId], references: [id])
+  rooms    Room[]
+  reviews  Review[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("properties")
+}
+
+model Room {
+  id         String @id @default(uuid())
+  propertyId String
+
+  name        String
+  basePrice   Int
+  description String
+
+  property       Property           @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  availabilities RoomAvailability[]
+  peakRates      PeakSeasonRate[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("rooms")
+}
+
+model RoomAvailability {
+  id     String @id @default(uuid())
+  roomId String
+
+  date        DateTime
+  isAvailable Boolean  @default(true)
+
+  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@unique([roomId, date])
+  @@map("room_availabilities")
+}
+
+model PeakSeasonRate {
+  id     String @id @default(uuid())
+  roomId String
+
+  startDate DateTime
+  endDate   DateTime
+
+  type  String // "PERCENTAGE" | "NOMINAL"
+  value Int
+
+  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@map("peak_season_rates")
+}
+
+model Review {
+  id         String @id @default(uuid())
+  userId     String
+  propertyId String
+
+  comment String
+  reply   String?
+
+  createdAt DateTime @default(now())
+
+  user     User     @relation(fields: [userId], references: [id])
+  property Property @relation(fields: [propertyId], references: [id])
+
+  @@unique([userId, propertyId])
+  @@map("reviews")
+}
