@@ -79,6 +79,7 @@ model User {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  orders    Order[]
 
   @@map("users")
 }
@@ -150,6 +151,7 @@ model Room {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  orders    Order[]
 
   @@map("rooms")
 }
@@ -181,19 +183,75 @@ model PeakSeasonRate {
   @@map("peak_season_rates")
 }
 
-model Review {
-  id         String @id @default(uuid())
-  userId     String
-  propertyId String
+enum StatusOrder {
+  WAITING_PAYMENT
+  REJECTED
+  EXPIRED
+  PAID
+  CANCELLED
+}
 
-  comment String
-  reply   String?
-
-  user     User     @relation(fields: [userId], references: [id])
-  property Property @relation(fields: [propertyId], references: [id])
+model Order {
+  id           String      @id @default(uuid())
+  customerId   String
+  roomId       String
+  roomsCount   Int         @default(1)
+  checkInDate  DateTime
+  checkOutDate DateTime
+  totalAmount  Float
+  status       StatusOrder @default(WAITING_PAYMENT)
+  verifiedAt   DateTime?
 
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  @@unique([userId, propertyId])
+  customer User @relation(fields: [customerId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  room     Room @relation(fields: [roomId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  payments Payment[]
+
+  @@map("order")
+}
+
+enum StatusPayment {
+  PENDING
+  WAITING_CONFIRMATION
+  CANCELLED
+  EXPIRED
+  REJECTED
+  DONE
+}
+
+model Payment {
+  id           String        @id @default(uuid())
+  orderId      String
+  totalPaid    Float
+  status       StatusPayment @default(PENDING)
+  paymentProof String?
+  paidAt       DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@map("payment")
+}
+
+model Review {
+  id         String  @id @default(uuid())
+  customerId String
+  propertyId String
+  rate       Float
+  comment    String
+  reply      String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  customer User     @relation(fields: [customerId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([customerId, propertyId])
   @@map("reviews")
 }
