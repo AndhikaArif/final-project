@@ -1,6 +1,6 @@
 generator client {
-  provider = "prisma-client"
-  output   = "../src/generated/prisma"
+  provider = "prisma-client-js"
+  output   = "../src/generated"
 }
 
 datasource db {
@@ -14,31 +14,36 @@ enum Role {
   TENANT
 }
 
+enum AuthProvider {
+  EMAIL
+  GOOGLE
+  FACEBOOK
+}
+
 enum VerificationStatus {
   PENDING
   VERIFIED
 }
 
-model User {
+// AUTH (CORE)
+model AuthAccount {
   id                 String             @id @default(uuid())
-  name               String
   email              String             @unique
   password           String?
   role               Role
+  provider           AuthProvider       @default(EMAIL)
   verificationStatus VerificationStatus @default(PENDING)
-
-  profileImage String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
 
   verificationToken  VerificationToken?
   resetPasswordToken ResetPasswordToken?
 
-  tenant  Tenant?
-  reviews Review[]
-  orders  Order[]
+  user   User?
+  tenant Tenant?
 
-  @@map("users")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("auth_accounts")
 }
 
 model VerificationToken {
@@ -46,8 +51,8 @@ model VerificationToken {
   token     String   @unique
   expiredAt DateTime
 
-  userId String @unique
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  authAccountId String      @unique
+  authAccount   AuthAccount @relation(fields: [authAccountId], references: [id], onDelete: Cascade)
 
   @@map("verification_tokens")
 }
@@ -57,18 +62,39 @@ model ResetPasswordToken {
   token     String   @unique
   expiredAt DateTime
 
-  userId String @unique
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  authAccountId String      @unique
+  authAccount   AuthAccount @relation(fields: [authAccountId], references: [id], onDelete: Cascade)
 
   @@map("reset_password_tokens")
 }
 
-model Tenant {
-  id     String @id @default(uuid())
-  userId String @unique
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+model User {
+  id            String  @id @default(uuid())
+  authAccountId String  @unique
+  name          String
+  profileImage  String?
 
-  properties Property[]
+  authAccount AuthAccount @relation(fields: [authAccountId], references: [id], onDelete: Cascade)
+  reviews     Review[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  orders    Order[]
+
+  @@map("users")
+}
+
+model Tenant {
+  id            String @id @default(uuid())
+  authAccountId String @unique
+
+  storeName    String
+  storeAddress String?
+  logo         String?
+  isApproved   Boolean @default(false)
+
+  authAccount AuthAccount @relation(fields: [authAccountId], references: [id], onDelete: Cascade)
+  properties  Property[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -77,12 +103,13 @@ model Tenant {
 }
 
 model PropertyCategory {
-  id        String   @id @default(uuid())
-  name      String   @unique
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id   String @id @default(uuid())
+  name String @unique
 
   properties Property[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("property_categories")
 }
@@ -148,9 +175,8 @@ model PeakSeasonRate {
 
   startDate DateTime
   endDate   DateTime
-
-  type  String // "PERCENTAGE" | "NOMINAL"
-  value Int
+  type      String
+  value     Int
 
   room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
 
