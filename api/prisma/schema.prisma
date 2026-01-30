@@ -1,17 +1,12 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client"
   output   = "../src/generated/prisma"
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 enum Role {
@@ -41,6 +36,7 @@ model User {
 
   tenant  Tenant?
   reviews Review[]
+  orders  Order[]
 
   @@map("users")
 }
@@ -128,6 +124,7 @@ model Room {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  orders    Order[]
 
   @@map("rooms")
 }
@@ -160,19 +157,75 @@ model PeakSeasonRate {
   @@map("peak_season_rates")
 }
 
-model Review {
-  id         String @id @default(uuid())
-  userId     String
-  propertyId String
+enum StatusOrder {
+  WAITING_PAYMENT
+  REJECTED
+  EXPIRED
+  PAID
+  CANCELLED
+}
 
-  comment String
-  reply   String?
+model Order {
+  id           String      @id @default(uuid())
+  customerId   String
+  roomId       String
+  roomsCount   Int         @default(1)
+  checkInDate  DateTime
+  checkOutDate DateTime
+  totalAmount  Float
+  status       StatusOrder @default(WAITING_PAYMENT)
+  verifiedAt   DateTime?
 
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  user     User     @relation(fields: [userId], references: [id])
-  property Property @relation(fields: [propertyId], references: [id])
+  customer User @relation(fields: [customerId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  room     Room @relation(fields: [roomId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
-  @@unique([userId, propertyId])
+  payments Payment[]
+
+  @@map("order")
+}
+
+enum StatusPayment {
+  PENDING
+  WAITING_CONFIRMATION
+  CANCELLED
+  EXPIRED
+  REJECTED
+  DONE
+}
+
+model Payment {
+  id           String        @id @default(uuid())
+  orderId      String
+  totalPaid    Float
+  status       StatusPayment @default(PENDING)
+  paymentProof String?
+  paidAt       DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@map("payment")
+}
+
+model Review {
+  id         String  @id @default(uuid())
+  customerId String
+  propertyId String
+  rate       Float
+  comment    String
+  reply      String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  customer User     @relation(fields: [customerId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([customerId, propertyId])
   @@map("reviews")
 }
