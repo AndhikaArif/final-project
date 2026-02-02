@@ -4,9 +4,7 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
+  provider = "postgresql"
 }
 
 enum Role {
@@ -79,6 +77,7 @@ model User {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  orders    Order[]
 
   @@map("users")
 }
@@ -101,42 +100,36 @@ model Tenant {
   @@map("tenants")
 }
 
-model PropertyCategory {
-  id   String @id @default(uuid())
-  name String @unique
-
-  properties Property[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@map("property_categories")
+enum PropertyCategory {
+  HOTEL
+  APARTEMENT
+  VILLA
+  KOS
 }
 
 model Property {
-  id         String @id @default(uuid())
-  tenantId   String
-  categoryId String
+  id       String @id @default(uuid())
+  tenantId String
 
   name        String
+  category    PropertyCategory
   description String
   address     String
   city        String
   image       String
-  maxGuest    Int
-
-  tenant   Tenant           @relation(fields: [tenantId], references: [id])
-  category PropertyCategory @relation(fields: [categoryId], references: [id])
-  rooms    Room[]
-  reviews  Review[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  type    RoomType[]
+  reviews Review[]
+
   @@map("properties")
 }
 
-model Room {
+model RoomType {
   id         String @id @default(uuid())
   propertyId String
 
@@ -144,56 +137,148 @@ model Room {
   basePrice   Int
   description String
 
-  property       Property           @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  availabilities RoomAvailability[]
-  peakRates      PeakSeasonRate[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  rooms Room[]
+
+  @@map("room_types")
+}
+
+model Room {
+  id     String @id @default(uuid())
+  typeId String
+
+  roomNumber Int
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  type RoomType @relation(fields: [typeId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  orderItems OrderItem[]
+
   @@map("rooms")
 }
 
-model RoomAvailability {
-  id     String @id @default(uuid())
-  roomId String
+// model RoomAvailability {
+//   id     String @id @default(uuid())
+//   roomId String
 
-  date        DateTime
-  isAvailable Boolean  @default(true)
+//   date        DateTime
+//   isAvailable Boolean  @default(true)
 
-  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+//   room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
 
-  @@unique([roomId, date])
-  @@map("room_availabilities")
+//   @@unique([roomId, date])
+//   @@map("room_availabilities")
+// }
+
+// model PeakSeasonRate {
+//   id     String @id @default(uuid())
+//   roomId String
+
+//   startDate DateTime
+//   endDate   DateTime
+//   type      String
+//   value     Int
+
+//   room       Room      @relation(fields: [roomId], references: [id], onDelete: Cascade)
+//   roomType   RoomType? @relation(fields: [roomTypeId], references: [id])
+//   roomTypeId String?
+
+//   @@map("peak_season_rates")
+// }
+
+model OrderItem {
+  id      String @id @default(uuid())
+  roomId  String
+  orderId String
+
+  roomQuantity Int      @default(1)
+  checkInDate  DateTime
+  checkOutDate DateTime
+  totalAmount  Float
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  room  Room  @relation(fields: [roomId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@map("order_items")
 }
 
-model PeakSeasonRate {
-  id     String @id @default(uuid())
-  roomId String
+enum StatusOrder {
+  WAITING_PAYMENT
+  REJECTED
+  EXPIRED
+  PAID
+  CANCELLED
+}
 
-  startDate DateTime
-  endDate   DateTime
-  type      String
-  value     Int
+model Order {
+  id         String @id @default(uuid())
+  customerId String
 
-  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  totalAmount Float
+  status      StatusOrder
+  verifiedAt  DateTime?
 
-  @@map("peak_season_rates")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  customer User @relation(fields: [customerId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  orderItems OrderItem[]
+  payments   Payment[]
+
+  @@map("orders")
+}
+
+enum StatusPayment {
+  PENDING
+  WAITING_CONFIRMATION
+  CANCELLED
+  EXPIRED
+  REJECTED
+  DONE
+}
+
+model Payment {
+  id      String @id @default(uuid())
+  orderId String
+
+  totalPaid    Float
+  status       StatusPayment @default(PENDING)
+  paymentProof String?
+  paidAt       DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@map("payment")
 }
 
 model Review {
   id         String @id @default(uuid())
-  userId     String
+  customerId String
   propertyId String
 
+  rate    Float
   comment String
   reply   String?
 
-  user     User     @relation(fields: [userId], references: [id])
-  property Property @relation(fields: [propertyId], references: [id])
-
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  @@unique([userId, propertyId])
+  customer User     @relation(fields: [customerId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([customerId, propertyId])
   @@map("reviews")
 }

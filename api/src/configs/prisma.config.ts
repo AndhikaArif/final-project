@@ -1,13 +1,12 @@
-import { PrismaClient } from "../generated/prisma/client.js";
+import "dotenv/config";
+import { defineConfig, env } from "prisma/config";
 
-declare global {
-  var prisma: PrismaClient | undefined;
-}
-
-const prisma = global.prisma || new PrismaClient();
-
-if (process.env.NODE_ENV !== "production") {
-  global.prisma = prisma;
-}
-
-export { prisma };
+export default defineConfig({
+  schema: "prisma/schema.prisma",
+  migrations: {
+    path: "prisma/migrations",
+  },
+  datasource: {
+    url: process.env["DIRECT_URL"]!,
+  },
+});
