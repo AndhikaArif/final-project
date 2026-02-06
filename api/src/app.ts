@@ -1,10 +1,15 @@
 import "dotenv/config";
+import cookieParser from "cookie-parser";
+import cors from "cors";
 
 import express, {
   type Application,
   type Request,
   type Response,
 } from "express";
+
+import authRoutes from "./routes/auth.route.js";
+import { ErrorMiddleware } from "./middlewares/error.middleware.js";
 
 class App {
   public app: Application;
@@ -28,6 +33,8 @@ class App {
       optionsSuccessStatus: 204,
     };
 
+    this.app.use(cors(corsOptions));
+    this.app.use(cookieParser());
     this.app.use(express.json());
   }
 
@@ -39,9 +46,14 @@ class App {
     });
   }
 
-  private initializeRoutes(): void {}
+  private initializeRoutes(): void {
+    this.app.use("/api/auth", authRoutes);
+  }
 
-  private initializeErrorHandler(): void {}
+  private initializeErrorHandler(): void {
+    this.app.use(ErrorMiddleware.notFound);
+    this.app.use(ErrorMiddleware.global);
+  }
 
   public listen(): void {
     this.app.listen(this.PORT, () =>
