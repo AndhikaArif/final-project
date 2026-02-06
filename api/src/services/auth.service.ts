@@ -1,21 +1,23 @@
 import bcrypt from "bcryptjs";
-import { Role } from "../generated/index.js";
+import { createHash } from "crypto";
+import jwt from "jsonwebtoken";
 
-import { prisma } from "../configs/prisma.config.js";
+import { prisma } from "../libs/prisma.lib.js";
 import { AppError } from "../errors/app.error.js";
 import { EmailUtil } from "../utils/email.util.js";
-import { generateToken } from "../utils/token.js";
+import { generateToken, generateResetToken } from "../utils/token.util.js";
+import type {
+  IRegisterPayload,
+  IRegisterSocialPayload,
+  ILoginPayload,
+  IResetPasswordPayload,
+  IVerifyEmailPayload,
+} from "../types/auth.type.js";
 
 const emailUtil = new EmailUtil();
 
 export class AuthService {
-  async register(payload: {
-    email: string;
-    role: Role;
-    name?: string; // USER
-    storeName?: string; // TENANT
-    storeAddress?: string;
-  }) {
+  async register(payload: IRegisterPayload) {
     const existing = await prisma.authAccount.findUnique({
       where: { email: payload.email },
     });
@@ -56,38 +58,98 @@ export class AuthService {
         data: {
           authAccountId: authAccount.id,
           storeName: payload.storeName,
-          storeAddress: payload.storeAddress,
+          storeAddress: payload.storeAddress ?? null,
         },
       });
     }
 
     // Create verification token
-    const token = generateToken();
+    const rawToken = generateToken();
+    const hashedToken = createHash("sha256").update(rawToken).digest("hex");
 
     await prisma.verificationToken.create({
       data: {
-        token,
-        expiredAt: new Date(Date.now() + 1 * 60 * 60 * 1000), // 1 hour
+        token: hashedToken,
+        expiredAt: new Date(Date.now() + 60 * 60 * 1000), // 1hour
         authAccountId: authAccount.id,
       },
     });
 
-    // Send email
-    await emailUtil.sendVerificationEmail(payload.email, token);
+    await emailUtil.sendVerificationEmail(payload.email, rawToken);
 
     return {
       message: "Verification email sent",
     };
   }
 
-  async verifyEmail(payload: { token: string; password: string }) {
+  async registerSocial(payload: IRegisterSocialPayload) {
+    const existing = await prisma.authAccount.findUnique({
+      where: { email: payload.email },
+      include: { user: true, tenant: true },
+    });
+
+    if (existing) {
+      return existing; // auto-login
+    }
+
+    const account = await prisma.authAccount.create({
+      data: {
+        email: payload.email,
+        role: payload.role,
+        provider: payload.provider,
+        verificationStatus: "VERIFIED",
+      },
+    });
+
+    if (payload.role === "USER") {
+      if (!payload.name) {
+        throw new AppError(400, "Name is required");
+      }
+
+      await prisma.user.create({
+        data: {
+          authAccountId: account.id,
+          name: payload.name,
+        },
+      });
+    }
+
+    if (payload.role === "TENANT") {
+      if (!payload.storeName) {
+        throw new AppError(400, "Store name is required");
+      }
+
+      await prisma.tenant.create({
+        data: {
+          authAccountId: account.id,
+          storeName: payload.storeName,
+          storeAddress: payload.storeAddress ?? null,
+        },
+      });
+    }
+
+    return {
+      message: "Social account registered",
+      authAccountId: account.id,
+    };
+  }
+
+  async verifyEmail(payload: IVerifyEmailPayload) {
+    const hashedToken = createHash("sha256")
+      .update(payload.token)
+      .digest("hex");
+
     const record = await prisma.verificationToken.findUnique({
-      where: { token: payload.token },
+      where: { token: hashedToken },
       include: { authAccount: true },
     });
 
     if (!record) {
       throw new AppError(400, "Invalid verification token");
+    }
+
+    if (record.authAccount.verificationStatus === "VERIFIED") {
+      throw new AppError(400, "Account already verified");
     }
 
     if (record.expiredAt < new Date()) {
@@ -113,7 +175,7 @@ export class AuthService {
     };
   }
 
-  async login(payload: { email: string; password: string; role: Role }) {
+  async login(payload: ILoginPayload) {
     const authAccount = await prisma.authAccount.findUnique({
       where: { email: payload.email },
       include: {
@@ -166,10 +228,132 @@ export class AuthService {
       throw new AppError(500, "Profile not found");
     }
 
+    const accessToken = jwt.sign(
+      {
+        sub: authAccount.id,
+        role: authAccount.role,
+      },
+      process.env.JWT_SECRET!,
+      { expiresIn: "1h" },
+    );
+
     return {
+      accessToken,
       authAccountId: authAccount.id,
       role: authAccount.role,
       profile,
     };
+  }
+
+  async forgotPassword(email: string) {
+    const account = await prisma.authAccount.findUnique({
+      where: { email },
+    });
+
+    // SECURITY: jangan bocorin email ada / nggak
+    if (!account) {
+      return;
+    }
+    // Batasi reset hanya EMAIL provider
+    if (account.provider !== "EMAIL") {
+      return;
+    }
+
+    const { rawToken, hashedToken } = generateResetToken();
+    const expiredAt = new Date(Date.now() + 1000 * 60 * 15); // 15 menit
+
+    await prisma.resetPasswordToken.upsert({
+      where: {
+        authAccountId: account.id,
+      },
+      update: {
+        token: hashedToken,
+        expiredAt,
+        usedAt: null,
+      },
+      create: {
+        token: hashedToken,
+        expiredAt,
+        authAccountId: account.id,
+      },
+    });
+
+    // kirim email
+    console.log("RESET TOKEN:", rawToken);
+  }
+
+  async resetPassword(payload: IResetPasswordPayload) {
+    const hashedToken = createHash("sha256")
+      .update(payload.token)
+      .digest("hex");
+
+    const record = await prisma.resetPasswordToken.findUnique({
+      where: { token: hashedToken },
+      include: { authAccount: true },
+    });
+
+    if (!record) {
+      throw new AppError(400, "Invalid reset token");
+    }
+
+    if (record.usedAt) {
+      throw new AppError(400, "Reset token already used");
+    }
+
+    if (record.expiredAt < new Date()) {
+      throw new AppError(400, "Reset token expired");
+    }
+
+    const hashedPassword = await bcrypt.hash(payload.newPassword, 10);
+
+    await prisma.$transaction([
+      prisma.authAccount.update({
+        where: { id: record.authAccountId },
+        data: {
+          password: hashedPassword,
+        },
+      }),
+
+      prisma.resetPasswordToken.update({
+        where: { id: record.id },
+        data: {
+          usedAt: new Date(),
+        },
+      }),
+    ]);
+
+    return {
+      message: "Password reset successful. Please login.",
+    };
+  }
+
+  async resendVerification(email: string) {
+    const account = await prisma.authAccount.findUnique({
+      where: { email },
+    });
+
+    if (!account) return;
+
+    if (account.verificationStatus === "VERIFIED") {
+      throw new AppError(400, "Account already verified");
+    }
+
+    // invalidate token lama
+    await prisma.verificationToken.deleteMany({
+      where: { authAccountId: account.id },
+    });
+
+    const rawToken = generateToken();
+    const hashedToken = createHash("sha256").update(rawToken).digest("hex");
+
+    await prisma.verificationToken.create({
+      data: {
+        token: hashedToken,
+        expiredAt: new Date(Date.now() + 60 * 60 * 1000),
+        authAccountId: account.id,
+      },
+    });
+
+    await emailUtil.sendVerificationEmail(account.email, rawToken);
   }
 }
