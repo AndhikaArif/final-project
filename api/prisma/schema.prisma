@@ -196,9 +196,9 @@ model Room {
 // }
 
 model OrderItem {
-  id      String  @id @default(uuid())
+  id      String @id @default(uuid())
   roomId  String
-  orderId String?
+  orderId String
 
   roomQuantity Int      @default(1)
   checkInDate  DateTime
