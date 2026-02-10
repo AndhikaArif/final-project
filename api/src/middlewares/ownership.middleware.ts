@@ -1,5 +1,5 @@
 import type { Request, Response, NextFunction } from "express";
-import { prisma } from "../configs/prisma.config.js";
+import { prisma } from "../../prisma.config.js";
 
 export class OwnershipMiddleware {
   static async ownsProperty(req: Request, res: Response, next: NextFunction) {

@@ -1,7 +1,7 @@
 import bcrypt from "bcryptjs";
 import { Role } from "../generated/index.js";
 
-import { prisma } from "../configs/prisma.config.js";
+import { prisma } from "../../prisma.config.js";
 import { AppError } from "../errors/app.error.js";
 import { EmailUtil } from "../utils/email.util.js";
 import { generateToken } from "../utils/token.js";
