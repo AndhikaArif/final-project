@@ -7,15 +7,17 @@ import { fileUpload } from "../middlewares/file-upload.middleware.js";
 const router = Router();
 const controller = new ProfileController();
 
+router.get("/", AuthenticationMiddleware.verifyToken, controller.myProfile);
+
 router.put(
-  "/profile",
+  "/",
   AuthenticationMiddleware.verifyToken,
   BusinessRuleMiddleware.requireVerifiedAccount(),
   controller.updateProfile,
 );
 
 router.post(
-  "/profile/image",
+  "/image",
   AuthenticationMiddleware.verifyToken,
   BusinessRuleMiddleware.requireVerifiedAccount(),
   fileUpload().single("image"),
@@ -23,13 +25,13 @@ router.post(
 );
 
 router.put(
-  "/profile/email",
+  "/email",
   AuthenticationMiddleware.verifyToken,
   controller.updateEmail,
 );
 
 router.put(
-  "/profile/password",
+  "/password",
   AuthenticationMiddleware.verifyToken,
   BusinessRuleMiddleware.requireVerifiedAccount(),
   controller.changePassword,

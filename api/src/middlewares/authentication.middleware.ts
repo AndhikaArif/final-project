@@ -13,15 +13,15 @@ export class AuthenticationMiddleware {
         });
       }
 
-      const verifiedToken = jwt.verify(
+      const decoded = jwt.verify(
         token,
         process.env.JWT_SECRET as string,
       ) as CustomJwtPayload;
 
-      req.currentUser = verifiedToken;
+      req.currentUser = decoded;
       next();
-    } catch {
-      res.status(401).json({ message: "Invalid or expired token" });
+    } catch (error) {
+      next(error);
     }
   }
 }

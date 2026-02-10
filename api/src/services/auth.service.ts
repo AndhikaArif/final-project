@@ -1,6 +1,5 @@
 import bcrypt from "bcryptjs";
 import { createHash } from "crypto";
-import jwt from "jsonwebtoken";
 
 import { prisma } from "../libs/prisma.lib.js";
 import { AppError } from "../errors/app.error.js";
@@ -82,6 +81,47 @@ export class AuthService {
     };
   }
 
+  async verifyEmail(payload: IVerifyEmailPayload) {
+    const hashedToken = createHash("sha256")
+      .update(payload.token)
+      .digest("hex");
+
+    const record = await prisma.verificationToken.findUnique({
+      where: { token: hashedToken },
+      include: { authAccount: true },
+    });
+
+    if (!record) {
+      throw new AppError(400, "Invalid verification token");
+    }
+
+    if (record.authAccount.verificationStatus === "VERIFIED") {
+      throw new AppError(400, "Account already verified");
+    }
+
+    if (record.expiredAt < new Date()) {
+      throw new AppError(401, "Verification token expired");
+    }
+
+    const hashedPassword = await bcrypt.hash(payload.password, 10);
+
+    await prisma.authAccount.update({
+      where: { id: record.authAccountId },
+      data: {
+        password: hashedPassword,
+        verificationStatus: "VERIFIED",
+      },
+    });
+
+    await prisma.verificationToken.delete({
+      where: { id: record.id },
+    });
+
+    return {
+      message: "Account verified successfully. Please login.",
+    };
+  }
+
   async registerSocial(payload: IRegisterSocialPayload) {
     const existing = await prisma.authAccount.findUnique({
       where: { email: payload.email },
@@ -89,7 +129,14 @@ export class AuthService {
     });
 
     if (existing) {
-      return existing; // auto-login
+      if (existing && existing.role !== payload.role) {
+        throw new AppError(403, "Unauthorized role access");
+      }
+
+      return {
+        authAccountId: existing.id,
+        role: existing.role,
+      };
     }
 
     const account = await prisma.authAccount.create({
@@ -129,49 +176,8 @@ export class AuthService {
     }
 
     return {
-      message: "Social account registered",
       authAccountId: account.id,
-    };
-  }
-
-  async verifyEmail(payload: IVerifyEmailPayload) {
-    const hashedToken = createHash("sha256")
-      .update(payload.token)
-      .digest("hex");
-
-    const record = await prisma.verificationToken.findUnique({
-      where: { token: hashedToken },
-      include: { authAccount: true },
-    });
-
-    if (!record) {
-      throw new AppError(400, "Invalid verification token");
-    }
-
-    if (record.authAccount.verificationStatus === "VERIFIED") {
-      throw new AppError(400, "Account already verified");
-    }
-
-    if (record.expiredAt < new Date()) {
-      throw new AppError(401, "Verification token expired");
-    }
-
-    const hashedPassword = await bcrypt.hash(payload.password, 10);
-
-    await prisma.authAccount.update({
-      where: { id: record.authAccountId },
-      data: {
-        password: hashedPassword,
-        verificationStatus: "VERIFIED",
-      },
-    });
-
-    await prisma.verificationToken.delete({
-      where: { id: record.id },
-    });
-
-    return {
-      message: "Account verified successfully. Please login.",
+      role: account.role,
     };
   }
 
@@ -228,17 +234,7 @@ export class AuthService {
       throw new AppError(500, "Profile not found");
     }
 
-    const accessToken = jwt.sign(
-      {
-        sub: authAccount.id,
-        role: authAccount.role,
-      },
-      process.env.JWT_SECRET!,
-      { expiresIn: "1h" },
-    );
-
     return {
-      accessToken,
       authAccountId: authAccount.id,
       role: authAccount.role,
       profile,
@@ -250,14 +246,9 @@ export class AuthService {
       where: { email },
     });
 
-    // SECURITY: jangan bocorin email ada / nggak
-    if (!account) {
-      return;
-    }
-    // Batasi reset hanya EMAIL provider
-    if (account.provider !== "EMAIL") {
-      return;
-    }
+    if (!account) return;
+    if (account.provider !== "EMAIL") return;
+    if (account.verificationStatus !== "VERIFIED") return;
 
     const { rawToken, hashedToken } = generateResetToken();
     const expiredAt = new Date(Date.now() + 1000 * 60 * 15); // 15 menit
@@ -332,7 +323,9 @@ export class AuthService {
       where: { email },
     });
 
-    if (!account) return;
+    if (!account) {
+      throw new AppError(400, "No Account");
+    }
 
     if (account.verificationStatus === "VERIFIED") {
       throw new AppError(400, "Account already verified");

@@ -8,12 +8,14 @@ const authService = new AuthService();
 export class AuthController {
   async register(req: Request, res: Response, next: NextFunction) {
     try {
-      const { email, role, name } = req.body;
+      const { email, role, name, storeName, storeAddress } = req.body;
 
       await authService.register({
         email,
         role,
         name,
+        storeName,
+        storeAddress,
       });
 
       res.status(201).json({
@@ -27,6 +29,18 @@ export class AuthController {
   async verifyEmail(req: Request, res: Response, next: NextFunction) {
     try {
       const { token, password } = req.body;
+
+      if (!token || !password) {
+        return res.status(400).json({
+          message: "Token and password are required for verification",
+        });
+      }
+
+      if (typeof password !== "string" || password.trim().length < 8) {
+        return res.status(400).json({
+          message: "Password must be at least 8 characters",
+        });
+      }
 
       await authService.verifyEmail({
         token,
@@ -56,7 +70,7 @@ export class AuthController {
 
       res.cookie("authenticationToken", token, {
         httpOnly: true,
-        secure: true,
+        secure: process.env.NODE_ENV === "production",
         sameSite: "strict",
       });
 
@@ -67,6 +81,25 @@ export class AuthController {
       });
     } catch (error) {
       next(error);
+    }
+  }
+
+  async socialLogin(req: Request, res: Response, next: NextFunction) {
+    try {
+      const result = await authService.registerSocial(req.body);
+
+      const token = signJwt({
+        authAccountId: result.authAccountId,
+        role: result.role,
+      });
+
+      res.status(200).json({
+        message: "Social login success",
+        role: result.role,
+        token,
+      });
+    } catch (err) {
+      next(err);
     }
   }
 
@@ -106,6 +139,24 @@ export class AuthController {
       res.json(result);
     } catch (error) {
       next(error);
+    }
+  }
+
+  async resendVerification(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { email } = req.body;
+
+      if (!email) {
+        return res.status(400).json({ message: "Email is required" });
+      }
+
+      await authService.resendVerification(email);
+
+      res.status(200).json({
+        message: "Verification email sent",
+      });
+    } catch (err) {
+      next(err);
     }
   }
 }
