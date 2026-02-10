@@ -3,14 +3,14 @@ import type { Request, Response, NextFunction } from "express";
 import { AuthService } from "../services/auth.service.js";
 import { signJwt } from "../utils/jwt.util.js";
 
-export class AuthController {
-  private service = new AuthService();
+const authService = new AuthService();
 
+export class AuthController {
   async register(req: Request, res: Response, next: NextFunction) {
     try {
       const { email, role, name } = req.body;
 
-      await this.service.register({
+      await authService.register({
         email,
         role,
         name,
@@ -28,7 +28,7 @@ export class AuthController {
     try {
       const { token, password } = req.body;
 
-      await this.service.verifyEmail({
+      await authService.verifyEmail({
         token,
         password,
       });
@@ -43,7 +43,7 @@ export class AuthController {
 
   async login(req: Request, res: Response, next: NextFunction) {
     try {
-      const result = await this.service.login({
+      const result = await authService.login({
         email: req.body.email,
         password: req.body.password,
         role: req.body.role,
@@ -65,6 +65,45 @@ export class AuthController {
         role: result.role,
         profile: result.profile,
       });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async forgotPassword(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { email } = req.body;
+
+      if (!email) {
+        return res.status(400).json({ message: "Email is required" });
+      }
+
+      await authService.forgotPassword(email);
+
+      return res.json({
+        message: "If the email exists, a reset link has been sent",
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async resetPassword(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { token, newPassword } = req.body;
+
+      if (!token || !newPassword) {
+        return res.status(400).json({
+          message: "Token and new password are required",
+        });
+      }
+
+      const result = await authService.resetPassword({
+        token,
+        newPassword,
+      });
+
+      res.json(result);
     } catch (error) {
       next(error);
     }

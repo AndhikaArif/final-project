@@ -1,16 +1,32 @@
 import type { Request, Response, NextFunction } from "express";
+<<<<<<< HEAD
 import { prisma } from "../../prisma.config.js";
+=======
+import { prisma } from "../libs/prisma.lib.js";
+>>>>>>> feature/akmal-schema
 
 export class OwnershipMiddleware {
   static async ownsProperty(req: Request, res: Response, next: NextFunction) {
     const propertyId = req.params.id;
-    const tenantId = req.currentUser?.id;
+    const authAccountId = req.currentUser?.id;
+
+    if (!propertyId || typeof propertyId !== "string") {
+      return res.status(400).json({
+        message: "Invalid property id",
+      });
+    }
+
+    if (!authAccountId) {
+      return res.status(401).json({
+        message: "Unauthorized",
+      });
+    }
 
     const property = await prisma.property.findFirst({
       where: {
         id: propertyId,
         tenant: {
-          authAccountId: tenantId,
+          authAccountId: authAccountId,
         },
       },
     });
@@ -28,6 +44,17 @@ export class OwnershipMiddleware {
     const roomId = req.params.id;
     const authAccountId = req.currentUser?.id;
 
+    if (!roomId || typeof roomId !== "string") {
+      return res.status(400).json({
+        message: "Invalid room id",
+      });
+    }
+
+    if (!authAccountId) {
+      return res.status(401).json({
+        message: "Unauthorized",
+      });
+    }
     const room = await prisma.room.findFirst({
       where: {
         id: roomId,

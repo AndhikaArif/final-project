@@ -1,6 +1,6 @@
 generator client {
-  provider = "prisma-client-js"
-  output   = "../src/generated"
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
 }
 
 datasource db {
@@ -21,6 +21,13 @@ enum AuthProvider {
 enum VerificationStatus {
   PENDING
   VERIFIED
+}
+
+enum PropertyCategory {
+  HOTEL
+  APARTMENT
+  VILLA
+  KOS
 }
 
 // AUTH (CORE)
@@ -56,9 +63,11 @@ model VerificationToken {
 }
 
 model ResetPasswordToken {
-  id        String   @id @default(uuid())
-  token     String   @unique
+  id        String    @id @default(uuid())
+  token     String    @unique
   expiredAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
 
   authAccountId String      @unique
   authAccount   AuthAccount @relation(fields: [authAccountId], references: [id], onDelete: Cascade)
@@ -100,23 +109,17 @@ model Tenant {
   @@map("tenants")
 }
 
-enum PropertyCategory {
-  HOTEL
-  APARTEMENT
-  VILLA
-  KOS
-}
-
 model Property {
-  id       String @id @default(uuid())
-  tenantId String
+  id               String           @id @default(uuid())
+  tenantId         String
+  propertyCategory PropertyCategory
 
   name        String
-  category    PropertyCategory
   description String
   address     String
   city        String
   image       String
+  maxGuest    Int
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
