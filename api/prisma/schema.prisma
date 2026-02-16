@@ -80,11 +80,12 @@ model User {
   profileImage  String?
 
   authAccount AuthAccount @relation(fields: [authAccountId], references: [id], onDelete: Cascade)
-  reviews     Review[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  orders    Order[]
+
+  orders  Order[]
+  reviews Review[]
 
   @@map("users")
 }
@@ -165,11 +166,12 @@ model RoomType {
 
   property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
-  rooms           Room[]
-  peakSeasonRates PeakSeasonRate[]
-
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  orderItems      OrderItem[]
+  rooms           Room[]
+  peakSeasonRates PeakSeasonRate[]
 
   @@index([propertyId])
   @@index([name])
@@ -182,30 +184,13 @@ model Room {
 
   roomNumber Int
 
-  orderItems         OrderItem[]
-  roomAvailabilities RoomAvailability[]
-
-  type RoomType @relation(fields: [typeId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  type RoomType @relation(fields: [typeId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
   @@unique([typeId, roomNumber])
   @@map("rooms")
-}
-
-model RoomAvailability {
-  id     String @id @default(uuid())
-  roomId String
-
-  date        DateTime
-  isAvailable Boolean  @default(true)
-
-  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
-
-  @@unique([roomId, date])
-  @@index([roomId, date])
-  @@map("room_availabilities")
 }
 
 model PeakSeasonRate {
@@ -229,20 +214,21 @@ model PeakSeasonRate {
 }
 
 model OrderItem {
-  id      String @id @default(uuid())
-  roomId  String
-  orderId String
+  id         String @id @default(uuid())
+  roomTypeId String
+  orderId    String
 
   roomQuantity Int      @default(1)
   checkInDate  DateTime
   checkOutDate DateTime
+  basePrice    Float
   totalAmount  Float
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  room  Room  @relation(fields: [roomId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  roomType RoomType @relation(fields: [roomTypeId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  order    Order    @relation(fields: [orderId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
   @@map("order_items")
 }
@@ -256,17 +242,18 @@ enum StatusOrder {
 }
 
 model Order {
-  id         String @id @default(uuid())
-  customerId String
+  id     String @id @default(uuid())
+  userId String
 
   totalAmount Float
-  status      StatusOrder
+  status      StatusOrder @default(WAITING_PAYMENT)
   verifiedAt  DateTime?
+  expiredAt   DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  customer User @relation(fields: [customerId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
   orderItems OrderItem[]
   payments   Payment[]
