@@ -1,5 +1,9 @@
 import type { Request, Response, NextFunction } from "express";
+<<<<<<< HEAD
+import { prisma } from "../../prisma.config.js";
+=======
 import { prisma } from "../libs/prisma.lib.js";
+>>>>>>> feature/akmal-schema
 
 export class OwnershipMiddleware {
   static async ownsProperty(req: Request, res: Response, next: NextFunction) {
