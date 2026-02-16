@@ -82,11 +82,12 @@ model User {
   profileImage  String?
 
   authAccount AuthAccount @relation(fields: [authAccountId], references: [id], onDelete: Cascade)
-  reviews     Review[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  orders    Order[]
+
+  orders  Order[]
+  reviews Review[]
 
   @@map("users")
 }
@@ -137,15 +138,17 @@ model RoomType {
   propertyId String
 
   name        String
-  basePrice   Int
+  basePrice   Float
   description String
+  totalRoom   Int
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
-  rooms Room[]
+  rooms      Room[]
+  orderItems OrderItem[]
 
   @@map("room_types")
 }
@@ -160,8 +163,6 @@ model Room {
   updatedAt DateTime @updatedAt
 
   type RoomType @relation(fields: [typeId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-
-  orderItems OrderItem[]
 
   @@map("rooms")
 }
@@ -196,20 +197,21 @@ model Room {
 // }
 
 model OrderItem {
-  id      String @id @default(uuid())
-  roomId  String
-  orderId String
+  id         String @id @default(uuid())
+  roomTypeId String
+  orderId    String
 
   roomQuantity Int      @default(1)
   checkInDate  DateTime
   checkOutDate DateTime
+  basePrice    Float
   totalAmount  Float
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  room  Room  @relation(fields: [roomId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  roomType RoomType @relation(fields: [roomTypeId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  order    Order    @relation(fields: [orderId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
   @@map("order_items")
 }
@@ -223,17 +225,18 @@ enum StatusOrder {
 }
 
 model Order {
-  id         String @id @default(uuid())
-  customerId String
+  id     String @id @default(uuid())
+  userId String
 
   totalAmount Float
-  status      StatusOrder
+  status      StatusOrder @default(WAITING_PAYMENT)
   verifiedAt  DateTime?
+  expiredAt   DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  customer User @relation(fields: [customerId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
   orderItems OrderItem[]
   payments   Payment[]

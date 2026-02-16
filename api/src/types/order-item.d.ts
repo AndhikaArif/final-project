@@ -1,5 +1,6 @@
 export interface ICreateOrderItem {
-  roomId: string;
+  roomTypeId: string;
+  orderId: string;
   roomQuantity: number;
   checkInDate: Date;
   checkOutDate: Date;
