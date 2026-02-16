@@ -1,9 +1,15 @@
 import { JwtPayload } from "jsonwebtoken";
 import type { Role, AuthProvider } from "../generated/prisma/enums.ts";
+export type AuthJsProvider = "google" | "facebook" | "credentials";
 
 export class CustomJwtPayload implements JwtPayload {
   authAccountId!: string;
   role!: Role;
+}
+
+export interface AuthJsPayload {
+  email: string;
+  provider: AuthJsProvider;
 }
 
 export class IRegisterPayload {
@@ -11,11 +17,11 @@ export class IRegisterPayload {
   role!: Role;
 
   // USER
-  name?: string;
+  name?: string | undefined;
 
   // TENANT
-  storeName?: string;
-  storeAddress?: string;
+  storeName?: string | undefined;
+  storeAddress?: string | undefined;
 }
 
 export class IRegisterSocialPayload {
@@ -24,11 +30,17 @@ export class IRegisterSocialPayload {
   provider!: "GOOGLE" | "FACEBOOK";
 
   // USER
-  name?: string;
+  name?: string | undefined;
 
   // TENANT
-  storeName?: string;
-  storeAddress?: string;
+  storeName?: string | undefined;
+  storeAddress?: string | undefined;
+}
+
+export class ILoginSocialPayload {
+  email!: string;
+  role!: Role;
+  provider!: AuthProvider;
 }
 
 export class IVerifyEmailPayload {
@@ -39,7 +51,6 @@ export class IVerifyEmailPayload {
 export class ILoginPayload {
   email!: string;
   password!: string;
-  role!: Role;
 }
 
 export class IResetPasswordPayload {

@@ -23,11 +23,9 @@ enum VerificationStatus {
   VERIFIED
 }
 
-enum PropertyCategory {
-  HOTEL
-  APARTMENT
-  VILLA
-  KOS
+enum AdjustmentType {
+  PERCENTAGE
+  NOMINAL
 }
 
 // AUTH (CORE)
@@ -100,8 +98,9 @@ model Tenant {
   logo         String?
   isApproved   Boolean @default(false)
 
-  authAccount AuthAccount @relation(fields: [authAccountId], references: [id], onDelete: Cascade)
+  authAccount AuthAccount        @relation(fields: [authAccountId], references: [id], onDelete: Cascade)
   properties  Property[]
+  categories  PropertyCategory[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -109,10 +108,28 @@ model Tenant {
   @@map("tenants")
 }
 
+// PROPERTY
+model PropertyCategory {
+  id       String @id @default(uuid())
+  tenantId String
+  name     String
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  properties Property[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@map("property_categories")
+}
+
 model Property {
-  id               String           @id @default(uuid())
-  tenantId         String
-  propertyCategory PropertyCategory
+  id         String @id @default(uuid())
+  tenantId   String
+  categoryId String
 
   name        String
   description String
@@ -120,15 +137,21 @@ model Property {
   city        String
   image       String
   maxGuest    Int
+  isActive    Boolean @default(true)
+
+  tenant   Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  category PropertyCategory @relation(fields: [categoryId], references: [id])
+
+  roomTypes RoomType[]
+  reviews   Review[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-
-  type    RoomType[]
-  reviews Review[]
-
+  @@index([tenantId])
+  @@index([name])
+  @@index([city])
+  @@index([categoryId])
   @@map("properties")
 }
 
@@ -140,13 +163,16 @@ model RoomType {
   basePrice   Int
   description String
 
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  rooms           Room[]
+  peakSeasonRates PeakSeasonRate[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-
-  rooms Room[]
-
+  @@index([propertyId])
+  @@index([name])
   @@map("room_types")
 }
 
@@ -156,44 +182,51 @@ model Room {
 
   roomNumber Int
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  orderItems         OrderItem[]
+  roomAvailabilities RoomAvailability[]
 
   type RoomType @relation(fields: [typeId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
-  orderItems OrderItem[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
+  @@unique([typeId, roomNumber])
   @@map("rooms")
 }
 
-// model RoomAvailability {
-//   id     String @id @default(uuid())
-//   roomId String
+model RoomAvailability {
+  id     String @id @default(uuid())
+  roomId String
 
-//   date        DateTime
-//   isAvailable Boolean  @default(true)
+  date        DateTime
+  isAvailable Boolean  @default(true)
 
-//   room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
 
-//   @@unique([roomId, date])
-//   @@map("room_availabilities")
-// }
+  @@unique([roomId, date])
+  @@index([roomId, date])
+  @@map("room_availabilities")
+}
 
-// model PeakSeasonRate {
-//   id     String @id @default(uuid())
-//   roomId String
+model PeakSeasonRate {
+  id         String @id @default(uuid())
+  roomTypeId String
 
-//   startDate DateTime
-//   endDate   DateTime
-//   type      String
-//   value     Int
+  startDate DateTime
+  endDate   DateTime
 
-//   room       Room      @relation(fields: [roomId], references: [id], onDelete: Cascade)
-//   roomType   RoomType? @relation(fields: [roomTypeId], references: [id])
-//   roomTypeId String?
+  adjustmentType AdjustmentType
+  value          Int
 
-//   @@map("peak_season_rates")
-// }
+  roomType RoomType @relation(fields: [roomTypeId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([roomTypeId])
+  @@index([roomTypeId, startDate, endDate])
+  @@map("peak_season_rates")
+}
 
 model OrderItem {
   id      String @id @default(uuid())

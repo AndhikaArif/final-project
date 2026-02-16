@@ -10,7 +10,7 @@ export class ErrorMiddleware {
     error: unknown,
     req: Request,
     res: Response,
-    next: NextFunction
+    next: NextFunction,
   ) {
     console.error(error);
 
@@ -19,7 +19,14 @@ export class ErrorMiddleware {
     }
 
     if (error instanceof Error) {
-      return res.status(500).json({ message: error.message });
+      return res
+        .status(500)
+        .json({
+          message:
+            process.env.NODE_ENV === "production"
+              ? "Internal server error"
+              : error.message,
+        });
     }
 
     return res

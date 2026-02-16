@@ -9,6 +9,7 @@ import express, {
 } from "express";
 
 import authRoutes from "./routes/auth.route.js";
+import profileRoutes from "./routes/profile.route.js";
 import { ErrorMiddleware } from "./middlewares/error.middleware.js";
 
 class App {
@@ -48,6 +49,7 @@ class App {
 
   private initializeRoutes(): void {
     this.app.use("/api/auth", authRoutes);
+    this.app.use("/api/profile", profileRoutes);
   }
 
   private initializeErrorHandler(): void {
