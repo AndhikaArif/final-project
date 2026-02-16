@@ -6,3 +6,13 @@ declare module "express-serve-static-core" {
     currentUser?: CostumJwtPayload | null;
   }
 }
+
+declare global {
+  namespace Express {
+    interface Request {
+      auth?: AuthJsPayload;
+    }
+  }
+}
+
+export {};

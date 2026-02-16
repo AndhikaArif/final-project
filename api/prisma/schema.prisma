@@ -23,11 +23,9 @@ enum VerificationStatus {
   VERIFIED
 }
 
-enum PropertyCategory {
-  HOTEL
-  APARTMENT
-  VILLA
-  KOS
+enum AdjustmentType {
+  PERCENTAGE
+  NOMINAL
 }
 
 // AUTH (CORE)
@@ -101,8 +99,9 @@ model Tenant {
   logo         String?
   isApproved   Boolean @default(false)
 
-  authAccount AuthAccount @relation(fields: [authAccountId], references: [id], onDelete: Cascade)
+  authAccount AuthAccount        @relation(fields: [authAccountId], references: [id], onDelete: Cascade)
   properties  Property[]
+  categories  PropertyCategory[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -110,10 +109,28 @@ model Tenant {
   @@map("tenants")
 }
 
+// PROPERTY
+model PropertyCategory {
+  id       String @id @default(uuid())
+  tenantId String
+  name     String
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  properties Property[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@map("property_categories")
+}
+
 model Property {
-  id               String           @id @default(uuid())
-  tenantId         String
-  propertyCategory PropertyCategory
+  id         String @id @default(uuid())
+  tenantId   String
+  categoryId String
 
   name        String
   description String
@@ -121,15 +138,21 @@ model Property {
   city        String
   image       String
   maxGuest    Int
+  isActive    Boolean @default(true)
+
+  tenant   Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  category PropertyCategory @relation(fields: [categoryId], references: [id])
+
+  roomTypes RoomType[]
+  reviews   Review[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-
-  type    RoomType[]
-  reviews Review[]
-
+  @@index([tenantId])
+  @@index([name])
+  @@index([city])
+  @@index([categoryId])
   @@map("properties")
 }
 
@@ -142,14 +165,24 @@ model RoomType {
   description String
   totalRoom   Int
 
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+<<<<<<< HEAD
   property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
   rooms      Room[]
   orderItems OrderItem[]
+=======
+  orderItems      OrderItem[]
+  rooms           Room[]
+  peakSeasonRates PeakSeasonRate[]
+>>>>>>> main
 
+  @@index([propertyId])
+  @@index([name])
   @@map("room_types")
 }
 
@@ -164,37 +197,32 @@ model Room {
 
   type RoomType @relation(fields: [typeId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
+<<<<<<< HEAD
+=======
+  @@unique([typeId, roomNumber])
+>>>>>>> main
   @@map("rooms")
 }
 
-// model RoomAvailability {
-//   id     String @id @default(uuid())
-//   roomId String
+model PeakSeasonRate {
+  id         String @id @default(uuid())
+  roomTypeId String
 
-//   date        DateTime
-//   isAvailable Boolean  @default(true)
+  startDate DateTime
+  endDate   DateTime
 
-//   room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  adjustmentType AdjustmentType
+  value          Int
 
-//   @@unique([roomId, date])
-//   @@map("room_availabilities")
-// }
+  roomType RoomType @relation(fields: [roomTypeId], references: [id], onDelete: Cascade)
 
-// model PeakSeasonRate {
-//   id     String @id @default(uuid())
-//   roomId String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-//   startDate DateTime
-//   endDate   DateTime
-//   type      String
-//   value     Int
-
-//   room       Room      @relation(fields: [roomId], references: [id], onDelete: Cascade)
-//   roomType   RoomType? @relation(fields: [roomTypeId], references: [id])
-//   roomTypeId String?
-
-//   @@map("peak_season_rates")
-// }
+  @@index([roomTypeId])
+  @@index([roomTypeId, startDate, endDate])
+  @@map("peak_season_rates")
+}
 
 model OrderItem {
   id         String @id @default(uuid())
