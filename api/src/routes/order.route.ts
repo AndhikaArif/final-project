@@ -17,7 +17,7 @@ router
 
 router
   .route("/history")
-  .post(
+  .get(
     AuthenticationMiddleware.verifyToken,
     AuthorizationMiddleware.allowRoles("USER"),
     orderController.getAllUserOrders,
@@ -25,7 +25,7 @@ router
 
 router
   .route("/orders")
-  .post(
+  .get(
     AuthenticationMiddleware.verifyToken,
     AuthorizationMiddleware.allowRoles("TENANT"),
     orderController.getAllUserOrders,
@@ -33,6 +33,6 @@ router
 
 router
   .route("/:id")
-  .post(AuthenticationMiddleware.verifyToken, orderController.getOrderById);
+  .get(AuthenticationMiddleware.verifyToken, orderController.getOrderById);
 
 export default router;

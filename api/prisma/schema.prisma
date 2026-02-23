@@ -273,7 +273,7 @@ enum StatusPayment {
 
 model Payment {
   id      String @id @default(uuid())
-  orderId String
+  orderId String @unique
 
   totalPaid    Float
   status       StatusPayment @default(PENDING)
