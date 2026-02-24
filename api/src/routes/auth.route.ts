@@ -11,10 +11,11 @@ router.post(
   RateLimitMiddleware.registerLimiter,
   authController.register,
 );
-router.post("/verify", authController.verifyEmail);
+router.post("/verify-email", authController.verifyEmail);
 router.post("/login", RateLimitMiddleware.loginLimiter, authController.login);
 router.post("/social/register", verifyAuthJs, authController.registerSocial);
 router.post("/social/login", verifyAuthJs, authController.loginSocial);
+router.post("/logout", authController.logout);
 
 router.post(
   "/forgot-password",

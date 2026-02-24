@@ -17,7 +17,7 @@ router.put(
 );
 
 router.post(
-  "/image",
+  "/upload-image",
   AuthenticationMiddleware.verifyToken,
   BusinessRuleMiddleware.requireVerifiedAccount(),
   fileUpload().single("image"),
@@ -25,7 +25,7 @@ router.post(
 );
 
 router.put(
-  "/email",
+  "/update-email",
   AuthenticationMiddleware.verifyToken,
   controller.updateEmail,
 );

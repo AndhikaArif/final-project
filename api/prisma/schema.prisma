@@ -30,9 +30,11 @@ enum AdjustmentType {
 
 // AUTH (CORE)
 model AuthAccount {
-  id                 String             @id @default(uuid())
-  email              String             @unique
-  password           String?
+  id           String  @id @default(uuid())
+  email        String  @unique
+  password     String?
+  tokenVersion Int     @default(0)
+
   role               Role
   provider           AuthProvider       @default(EMAIL)
   verificationStatus VerificationStatus @default(PENDING)
@@ -170,28 +172,12 @@ model RoomType {
 
   property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
-  rooms           Room[]
   orderItems      OrderItem[]
   peakSeasonRates PeakSeasonRate[]
 
   @@index([propertyId])
   @@index([name])
   @@map("room_types")
-}
-
-model Room {
-  id     String @id @default(uuid())
-  typeId String
-
-  roomNumber Int
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  type RoomType @relation(fields: [typeId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-
-  @@unique([typeId, roomNumber])
-  @@map("rooms")
 }
 
 model PeakSeasonRate {
