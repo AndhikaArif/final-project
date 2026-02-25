@@ -10,6 +10,8 @@ import express, {
 
 import authRoutes from "./routes/auth.route.js";
 import profileRoutes from "./routes/profile.route.js";
+import orderRoutes from "./routes/order.route.js";
+import paymentRoutes from "./routes/payment.route.js";
 import { ErrorMiddleware } from "./middlewares/error.middleware.js";
 
 class App {
@@ -50,6 +52,8 @@ class App {
   private initializeRoutes(): void {
     this.app.use("/api/auth", authRoutes);
     this.app.use("/api/profile", profileRoutes);
+    this.app.use("/api/order", orderRoutes);
+    this.app.use("/api/payment", paymentRoutes);
   }
 
   private initializeErrorHandler(): void {

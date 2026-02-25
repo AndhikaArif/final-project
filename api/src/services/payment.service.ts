@@ -339,9 +339,11 @@ export class PaymentService {
         case "EXPIRED":
           return "EXPIRED";
 
+        case "CANCELLED":
+          return "CANCELLED";
+
         case "PENDING":
         case "WAITING_CONFIRMATION":
-        case "CANCELLED":
         default:
           return "WAITING_PAYMENT";
       }
