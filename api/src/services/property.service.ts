@@ -1,17 +1,16 @@
 import { prisma } from "../libs/prisma.lib.js";
+import type { Prisma } from "../generated/prisma/client.js";
 import { AppError } from "../errors/app.error.js";
+import { TenantResolverService } from "./tenant-resolver.service.js";
+import type {
+  CatalogQuery,
+  DetailQuery,
+  CreatePropertyDTO,
+  UpdatePropertyDTO,
+} from "../validations/property.validation.js";
 
-export class roomService {
-  async getPropertyCatalog(params: {
-    city: string;
-    checkIn: Date;
-    checkOut: Date;
-    search?: string;
-    category?: string;
-    sort?: string;
-    page?: number;
-    limit?: number;
-  }) {
+export class PropertyService {
+  async getPropertyCatalog(params: CatalogQuery) {
     const {
       city,
       checkIn,
@@ -25,7 +24,7 @@ export class roomService {
 
     const skip = (page - 1) * limit;
 
-    const where: any = {
+    const where: Prisma.PropertyWhereInput = {
       city: { contains: city, mode: "insensitive" },
       isActive: true,
     };
@@ -38,9 +37,14 @@ export class roomService {
       where.categoryId = category;
     }
 
+    if (checkIn >= checkOut) {
+      throw new AppError(400, "checkOut must be after checkIn");
+    }
+
     const properties = await prisma.property.findMany({
       where,
       include: {
+        category: true,
         roomTypes: {
           include: {
             peakSeasonRates: {
@@ -56,87 +60,296 @@ export class roomService {
       take: limit,
     });
 
-    const result = [];
+    // ================================
+    // STEP 1: Ambil semua roomTypeId
+    // ================================
+    const roomTypeIds = properties.flatMap((p) => p.roomTypes.map((r) => r.id));
+
+    // ================================
+    // STEP 2: Query booking SEKALI
+    // ================================
+    const now = new Date();
+
+    const bookedGrouped = await prisma.orderItem.groupBy({
+      by: ["roomTypeId"],
+      where: {
+        roomTypeId: { in: roomTypeIds },
+        order: {
+          OR: [
+            {
+              status: "PAID",
+            },
+            {
+              status: "WAITING_PAYMENT",
+              expiredAt: { gt: now },
+            },
+          ],
+        },
+        checkInDate: { lt: checkOut },
+        checkOutDate: { gt: checkIn },
+      },
+      _sum: {
+        roomQuantity: true,
+      },
+    });
+
+    // ================================
+    // STEP 3: Buat Map
+    // ================================
+    const bookedMap = new Map<string, number>();
+
+    for (const item of bookedGrouped) {
+      bookedMap.set(item.roomTypeId, item._sum.roomQuantity ?? 0);
+    }
+
+    const results: {
+      id: string;
+      name: string;
+      image: string | null;
+      city: string;
+      category: string;
+      cheapestPrice: number;
+    }[] = [];
 
     for (const property of properties) {
       let cheapestPrice: number | null = null;
 
       for (const room of property.roomTypes) {
-        // 1️⃣ Availability Check
-        const booked = await prisma.orderItem.aggregate({
-          _sum: { roomQuantity: true },
-          where: {
-            roomTypeId: room.id,
-            order: {
-              status: { in: ["WAITING_PAYMENT", "PAID"] },
-            },
-            checkInDate: { lt: checkOut },
-            checkOutDate: { gt: checkIn },
-          },
-        });
-
-        const bookedQty = booked._sum.roomQuantity ?? 0;
+        const bookedQty = bookedMap.get(room.id) ?? 0;
         const available = room.totalRoom - bookedQty;
 
         if (available <= 0) continue;
 
-        // 2️⃣ Price Calculation
-        let total = 0;
+        let totalPrice = 0;
         let current = new Date(checkIn);
 
-        while (current < checkOut) {
-          let dailyPrice = room.basePrice;
+        while (current.getTime() < checkOut.getTime()) {
+          let price = room.basePrice;
 
           const peak = room.peakSeasonRates.find(
-            (rate) => current >= rate.startDate && current <= rate.endDate,
+            (r) => current >= r.startDate && current <= r.endDate,
           );
 
           if (peak) {
-            if (peak.adjustmentType === "PERCENTAGE") {
-              dailyPrice += (dailyPrice * peak.value) / 100;
-            } else {
-              dailyPrice += peak.value;
-            }
+            price +=
+              peak.adjustmentType === "PERCENTAGE"
+                ? (price * peak.value) / 100
+                : peak.value;
           }
 
-          total += dailyPrice;
+          totalPrice += price;
           current.setDate(current.getDate() + 1);
         }
 
-        if (cheapestPrice === null || total < cheapestPrice) {
-          cheapestPrice = total;
+        if (cheapestPrice === null || totalPrice < cheapestPrice) {
+          cheapestPrice = totalPrice;
         }
       }
 
       if (cheapestPrice !== null) {
-        result.push({
+        results.push({
           id: property.id,
           name: property.name,
           image: property.image,
           city: property.city,
-          categoryId: property.categoryId,
+          category: property.category.name,
           cheapestPrice,
         });
       }
     }
 
-    // 3️⃣ Sort by price jika diperlukan
-    if (sort === "price_asc") {
-      result.sort((a, b) => a.cheapestPrice - b.cheapestPrice);
+    // SORT
+    if (sort === "price_asc")
+      results.sort((a, b) => a.cheapestPrice - b.cheapestPrice);
+    if (sort === "price_desc")
+      results.sort((a, b) => b.cheapestPrice - a.cheapestPrice);
+    if (sort === "name_desc")
+      results.sort((a, b) => b.name.localeCompare(a.name));
+    if (sort === "name_asc")
+      results.sort((a, b) => a.name.localeCompare(b.name));
+
+    return {
+      data: results,
+      meta: {
+        returned: results.length, // lebih akurat dari count awal
+        page,
+        limit,
+      },
+    };
+  }
+
+  async getPropertyDetail(propertyId: string, query: DetailQuery) {
+    const { checkIn, checkOut } = query;
+
+    const property = await prisma.property.findFirst({
+      where: {
+        id: propertyId,
+        isActive: true,
+      },
+      include: {
+        category: true,
+        roomTypes: {
+          include: {
+            peakSeasonRates: true,
+          },
+        },
+        reviews: true,
+      },
+    });
+
+    if (!property) throw new AppError(404, "Property not found");
+
+    if (checkIn >= checkOut) {
+      throw new AppError(400, "checkOut must be after checkIn");
     }
 
-    if (sort === "price_desc") {
-      result.sort((a, b) => b.cheapestPrice - a.cheapestPrice);
-    }
+    const rooms = [];
 
-    if (sort === "name_desc") {
-      result.sort((a, b) => b.name.localeCompare(a.name));
+    for (const room of property.roomTypes) {
+      const prices: Record<string, number> = {};
+
+      let current = new Date(checkIn);
+
+      while (current.getTime() < checkOut.getTime()) {
+        let price = room.basePrice;
+
+        const peak = room.peakSeasonRates.find(
+          (r) => current >= r.startDate && current <= r.endDate,
+        );
+
+        if (peak) {
+          price +=
+            peak.adjustmentType === "PERCENTAGE"
+              ? (price * peak.value) / 100
+              : peak.value;
+        }
+
+        const dateKey = current.toLocaleDateString("sv-SE");
+        prices[dateKey] = price;
+
+        current.setDate(current.getDate() + 1);
+      }
+
+      rooms.push({
+        id: room.id,
+        name: room.name,
+        description: room.description,
+        totalRoom: room.totalRoom,
+        priceCalendar: prices,
+      });
     }
 
     return {
-      data: result,
-      page,
-      limit,
+      id: property.id,
+      name: property.name,
+      description: property.description,
+      image: property.image,
+      address: property.address,
+      city: property.city,
+      category: property.category.name,
+      rooms,
+      reviews: property.reviews,
     };
+  }
+
+  async createProperty(authAccountId: string, data: CreatePropertyDTO) {
+    const tenantId = await TenantResolverService.getTenantId(authAccountId);
+
+    const category = await prisma.propertyCategory.findFirst({
+      where: {
+        id: data.categoryId,
+        tenantId,
+      },
+    });
+
+    if (!category) {
+      throw new AppError(403, "Invalid category for this tenant");
+    }
+
+    return prisma.property.create({
+      data: {
+        tenantId,
+        name: data.name,
+        description: data.description,
+        address: data.address,
+        city: data.city,
+        categoryId: data.categoryId,
+        maxGuest: data.maxGuest,
+        ...(data.image !== undefined && { image: data.image }),
+      },
+    });
+  }
+
+  async updateProperty(
+    id: string,
+    authAccountId: string,
+    data: UpdatePropertyDTO,
+  ) {
+    const tenantId = await TenantResolverService.getTenantId(authAccountId);
+
+    const property = await prisma.property.findFirst({
+      where: { id, tenantId },
+    });
+
+    if (!property) {
+      throw new AppError(403, "You are not allowed to update this property");
+    }
+
+    if (data.categoryId) {
+      const category = await prisma.propertyCategory.findFirst({
+        where: { id: data.categoryId, tenantId },
+      });
+
+      if (!category) {
+        throw new AppError(403, "Invalid category for this tenant");
+      }
+    }
+
+    return prisma.property.update({
+      where: { id },
+      data: {
+        ...(data.name !== undefined && { name: data.name }),
+        ...(data.description !== undefined && {
+          description: data.description,
+        }),
+        ...(data.address !== undefined && { address: data.address }),
+        ...(data.city !== undefined && { city: data.city }),
+        ...(data.categoryId !== undefined && { categoryId: data.categoryId }),
+        ...(data.maxGuest !== undefined && { maxGuest: data.maxGuest }),
+        ...(data.image !== undefined && { image: data.image }),
+      },
+    });
+  }
+
+  async deleteProperty(id: string, authAccountId: string) {
+    const tenantId = await TenantResolverService.getTenantId(authAccountId);
+
+    const property = await prisma.property.findFirst({
+      where: { id, tenantId },
+    });
+
+    if (!property) {
+      throw new AppError(403, "You are not allowed to delete this property");
+    }
+
+    return prisma.property.delete({
+      where: { id },
+    });
+  }
+
+  async getTenantProperties(authAccountId: string) {
+    const tenantId = await TenantResolverService.getTenantId(authAccountId);
+
+    return prisma.property.findMany({
+      where: { tenantId },
+      include: {
+        category: true,
+        roomTypes: {
+          include: {
+            peakSeasonRates: true,
+          },
+        },
+      },
+    });
   }
 }

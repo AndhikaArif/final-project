@@ -138,7 +138,7 @@ model Property {
   description String
   address     String
   city        String
-  image       String
+  image       String?
   maxGuest    Int
   isActive    Boolean @default(true)
 

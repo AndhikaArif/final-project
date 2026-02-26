@@ -33,6 +33,7 @@ export class ErrorMiddleware {
           process.env.NODE_ENV === "production"
             ? "Internal server error"
             : error.message,
+        time: new Date().toISOString(),
       });
     }
 

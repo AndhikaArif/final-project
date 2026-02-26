@@ -8,7 +8,6 @@ import { AuthValidation } from "../validations/auth.validation.js";
 import { AppError } from "../errors/app.error.js";
 import type { AuthJsPayload, AuthJsProvider } from "../types/auth.type.js";
 import type { AuthProvider } from "../generated/prisma/enums.js";
-import { profile } from "console";
 
 const authService = new AuthService();
 const emailService = new EmailService();
