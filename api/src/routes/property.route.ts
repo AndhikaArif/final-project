@@ -21,6 +21,14 @@ const categoryController = new CategoryController();
 
 /* ================= PUBLIC ================= */
 
+router.get("/properties/cities", propertyController.getCities);
+
+router.get(
+  "/properties/:id/calendar",
+  validate(PropertySchema.idParam, "params"),
+  propertyController.getPropertyCalendar,
+);
+
 router.get(
   "/properties",
   validate(PropertySchema.catalogQuery, "query"),
@@ -50,37 +58,41 @@ router.post(
 );
 
 router.put(
-  "/categories:id",
+  "/categories/:id",
   validate(PropertySchema.idParam, "params"),
   validate(PropertySchema.updateCategory, "body"),
   categoryController.updateCategory,
 );
 
 router.delete(
-  "/categories:id",
+  "/categories/:id",
   validate(PropertySchema.idParam, "params"),
   categoryController.deleteCategory,
 );
 
-/* ===== PROPERTY ===== */
+router.get("/categories", categoryController.getCategories);
+
+/* ===== TENANT PROPERTY ===== */
+
+router.get("/tenant/properties", propertyController.getTenantProperties);
 
 router.post(
-  "/properties",
+  "/tenant/properties",
   fileUpload().single("image"),
   validate(PropertySchema.createProperty, "body"),
   propertyController.createProperty,
 );
 
 router.put(
-  "/properties/:id",
-  validate(PropertySchema.idParam, "params"),
+  "/tenant/properties/:id",
   fileUpload().single("image"),
+  validate(PropertySchema.idParam, "params"),
   validate(PropertySchema.updateProperty, "body"),
   propertyController.updateProperty,
 );
 
 router.delete(
-  "/properties/:id",
+  "/tenant/properties/:id",
   validate(PropertySchema.idParam, "params"),
   propertyController.deleteProperty,
 );
@@ -105,6 +117,12 @@ router.delete(
   "/rooms/:id",
   validate(PropertySchema.idParam, "params"),
   roomController.deleteRoom,
+);
+
+router.get(
+  "/properties/:propertyId/rooms",
+  validate(PropertySchema.propertyIdParam, "params"),
+  roomController.getRoomsByProperty,
 );
 
 /* ===== PEAK SEASON ===== */

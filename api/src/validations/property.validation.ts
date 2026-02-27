@@ -58,7 +58,6 @@ export class PropertySchema {
     city: z.string().min(1),
     categoryId: z.string().uuid(),
     maxGuest: z.coerce.number().min(1),
-    image: z.string().url().optional(),
   });
 
   static updateProperty = PropertySchema.createProperty.partial();
@@ -81,6 +80,7 @@ export class PropertySchema {
   /* -------------------------------------------------------------------------- */
 
   static createPeakSeason = z.object({
+    roomTypeId: z.string().uuid(),
     startDate: z.coerce.date(),
     endDate: z.coerce.date(),
     adjustmentType: z.enum(["PERCENTAGE", "NOMINAL"]),

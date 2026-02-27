@@ -11,6 +11,8 @@ export class CategoryController {
 
       const result = await categoryService.createCategory(authAccountId, body);
 
+      console.log(result);
+
       res.status(201).json({
         message: "Category created successfully",
         data: result,
@@ -53,6 +55,18 @@ export class CategoryController {
       });
     } catch (error) {
       next(error);
+    }
+  }
+
+  async getCategories(req: Request, res: Response, next: NextFunction) {
+    try {
+      const authAccountId = req.currentUser!.authAccountId;
+
+      const data = await categoryService.getCategories(authAccountId);
+
+      res.json({ data });
+    } catch (err) {
+      next(err);
     }
   }
 }

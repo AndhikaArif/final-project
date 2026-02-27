@@ -9,12 +9,20 @@ import { useAuth } from "@/context/auth-context";
 import PasswordField from "@/components/form/passwordField";
 import { useState, useEffect } from "react";
 import LoadingScreen from "@/components/loading-screen";
+import toast from "react-hot-toast";
 
 export default function LoginPage() {
   const router = useRouter();
   const { refreshUser } = useAuth();
   const [globalError, setGlobalError] = useState<string | null>(null);
   const { user, loading } = useAuth();
+
+  useEffect(() => {
+    if (localStorage.getItem("session-expired")) {
+      toast.error("Session expired, please login again");
+      localStorage.removeItem("session-expired");
+    }
+  }, []);
 
   useEffect(() => {
     if (!loading && user) {
@@ -63,7 +71,6 @@ export default function LoginPage() {
                 //  Username / password salah
                 if (status === 400) {
                   setErrors({
-                    email: "Invalid email or password",
                     password: "Invalid email or password",
                   });
                   return;

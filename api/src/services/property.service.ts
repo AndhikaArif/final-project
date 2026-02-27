@@ -8,6 +8,9 @@ import type {
   CreatePropertyDTO,
   UpdatePropertyDTO,
 } from "../validations/property.validation.js";
+import { FileUpload } from "../utils/file-upload.util.js";
+
+const fileUploadService = new FileUpload();
 
 export class PropertyService {
   async getPropertyCatalog(params: CatalogQuery) {
@@ -252,7 +255,11 @@ export class PropertyService {
     };
   }
 
-  async createProperty(authAccountId: string, data: CreatePropertyDTO) {
+  async createProperty(
+    authAccountId: string,
+    data: CreatePropertyDTO,
+    file?: Express.Multer.File,
+  ) {
     const tenantId = await TenantResolverService.getTenantId(authAccountId);
 
     const category = await prisma.propertyCategory.findFirst({
@@ -266,6 +273,12 @@ export class PropertyService {
       throw new AppError(403, "Invalid category for this tenant");
     }
 
+    let imageUrl: string | undefined = undefined;
+
+    if (file) {
+      imageUrl = await fileUploadService.uploadSingle(file.path);
+    }
+
     return prisma.property.create({
       data: {
         tenantId,
@@ -275,7 +288,7 @@ export class PropertyService {
         city: data.city,
         categoryId: data.categoryId,
         maxGuest: data.maxGuest,
-        ...(data.image !== undefined && { image: data.image }),
+        ...(imageUrl && { image: imageUrl }),
       },
     });
   }
@@ -284,6 +297,7 @@ export class PropertyService {
     id: string,
     authAccountId: string,
     data: UpdatePropertyDTO,
+    file?: Express.Multer.File,
   ) {
     const tenantId = await TenantResolverService.getTenantId(authAccountId);
 
@@ -305,6 +319,12 @@ export class PropertyService {
       }
     }
 
+    let imageUrl: string | undefined = undefined;
+
+    if (file) {
+      imageUrl = await fileUploadService.uploadSingle(file.path);
+    }
+
     return prisma.property.update({
       where: { id },
       data: {
@@ -316,7 +336,7 @@ export class PropertyService {
         ...(data.city !== undefined && { city: data.city }),
         ...(data.categoryId !== undefined && { categoryId: data.categoryId }),
         ...(data.maxGuest !== undefined && { maxGuest: data.maxGuest }),
-        ...(data.image !== undefined && { image: data.image }),
+        ...(imageUrl && { image: imageUrl }),
       },
     });
   }
@@ -351,5 +371,78 @@ export class PropertyService {
         },
       },
     });
+  }
+
+  async getCities() {
+    const cities = await prisma.property.findMany({
+      where: { isActive: true },
+      select: { city: true },
+      distinct: ["city"],
+      orderBy: { city: "asc" },
+    });
+
+    return cities.map((c) => c.city);
+  }
+
+  async getPropertyCalendar(propertyId: string) {
+    const property = await prisma.property.findFirst({
+      where: { id: propertyId, isActive: true },
+      include: {
+        roomTypes: {
+          include: {
+            peakSeasonRates: true,
+          },
+        },
+      },
+    });
+
+    if (!property) throw new AppError(404, "Property not found");
+
+    const today = new Date();
+    const days: {
+      date: string;
+      price: number;
+      isPeak: boolean;
+      available: boolean;
+    }[] = [];
+
+    for (let i = 0; i < 30; i++) {
+      const current = new Date(today);
+      current.setDate(today.getDate() + i);
+
+      let cheapest: number | null = null;
+      let isPeak = false;
+
+      for (const room of property.roomTypes) {
+        let price = room.basePrice;
+
+        const peak = room.peakSeasonRates.find(
+          (r) => current >= r.startDate && current <= r.endDate,
+        );
+
+        if (peak) {
+          isPeak = true;
+          price +=
+            peak.adjustmentType === "PERCENTAGE"
+              ? (price * peak.value) / 100
+              : peak.value;
+        }
+
+        if (cheapest === null || price < cheapest) {
+          cheapest = price;
+        }
+      }
+
+      if (cheapest !== null) {
+        days.push({
+          date: current.toISOString().slice(0, 10),
+          price: cheapest,
+          isPeak,
+          available: true, // nanti bisa kamu upgrade cek availability
+        });
+      }
+    }
+
+    return days;
   }
 }

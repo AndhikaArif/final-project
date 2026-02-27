@@ -36,6 +36,20 @@ export class CategoryService {
       throw new AppError(403, "You are not allowed to update this category");
     }
 
+    if (data.name) {
+      const exists = await prisma.propertyCategory.findFirst({
+        where: {
+          tenantId,
+          name: data.name,
+          NOT: { id },
+        },
+      });
+
+      if (exists) {
+        throw new AppError(400, "Category with this name already exists");
+      }
+    }
+
     return prisma.propertyCategory.update({
       where: { id },
       data: {
@@ -57,6 +71,15 @@ export class CategoryService {
 
     return prisma.propertyCategory.delete({
       where: { id },
+    });
+  }
+
+  async getCategories(authAccountId: string) {
+    const tenantId = await TenantResolverService.getTenantId(authAccountId);
+
+    return prisma.propertyCategory.findMany({
+      where: { tenantId },
+      orderBy: { name: "asc" },
     });
   }
 }

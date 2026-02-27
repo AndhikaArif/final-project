@@ -26,6 +26,17 @@ export class RoomService {
       );
     }
 
+    const existing = await prisma.roomType.findFirst({
+      where: {
+        propertyId,
+        name: data.name,
+      },
+    });
+
+    if (existing) {
+      throw new AppError(409, "Room name already exists in this property");
+    }
+
     return prisma.roomType.create({
       data: {
         propertyId,
@@ -84,6 +95,21 @@ export class RoomService {
 
     return prisma.roomType.delete({
       where: { id },
+    });
+  }
+
+  async getRoomsByProperty(propertyId: string, authAccountId: string) {
+    const tenantId = await TenantResolverService.getTenantId(authAccountId);
+
+    const property = await prisma.property.findFirst({
+      where: { id: propertyId, tenantId },
+    });
+
+    if (!property) throw new AppError(403, "Not allowed");
+
+    return prisma.roomType.findMany({
+      where: { propertyId },
+      orderBy: { createdAt: "desc" },
     });
   }
 }

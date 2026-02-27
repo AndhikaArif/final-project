@@ -85,6 +85,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   function forceLogout() {
     broadcastLogout();
     setUser(null);
+
+    localStorage.setItem("session-expired", "true");
+
+    window.location.href = "/login";
   }
 
   return (
