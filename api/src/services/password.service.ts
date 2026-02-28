@@ -5,6 +5,9 @@ import { prisma } from "../libs/prisma.lib.js";
 import { AppError } from "../errors/app.error.js";
 import { generateResetToken } from "../utils/token.util.js";
 import type { IResetPasswordPayload } from "../types/auth.type.js";
+import { EmailUtil } from "../utils/email.util.js";
+
+const emailUtil = new EmailUtil();
 
 export class PasswordService {
   async forgotPassword(email: string) {
@@ -13,8 +16,8 @@ export class PasswordService {
     });
 
     if (!account) return;
-    if (account.provider !== "EMAIL") return;
     if (account.verificationStatus !== "VERIFIED") return;
+    if (account.provider !== "EMAIL") return;
 
     const { rawToken, hashedToken } = generateResetToken();
     const expiredAt = new Date(Date.now() + 1000 * 60 * 15); // 15 menit
@@ -36,7 +39,9 @@ export class PasswordService {
     });
 
     // kirim email
-    console.log("RESET TOKEN:", rawToken);
+    `${process.env.WEB_DOMAIN}/reset-password?token=${rawToken}`;
+
+    await emailUtil.sendResetPasswordEmail(account.email, rawToken);
   }
 
   async resetPassword(payload: IResetPasswordPayload) {
@@ -68,6 +73,7 @@ export class PasswordService {
         where: { id: record.authAccountId },
         data: {
           password: hashedPassword,
+          tokenVersion: { increment: 1 },
         },
       }),
 

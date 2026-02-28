@@ -30,9 +30,11 @@ enum AdjustmentType {
 
 // AUTH (CORE)
 model AuthAccount {
-  id                 String             @id @default(uuid())
-  email              String             @unique
-  password           String?
+  id           String  @id @default(uuid())
+  email        String  @unique
+  password     String?
+  tokenVersion Int     @default(0)
+
   role               Role
   provider           AuthProvider       @default(EMAIL)
   verificationStatus VerificationStatus @default(PENDING)
@@ -136,7 +138,7 @@ model Property {
   description String
   address     String
   city        String
-  image       String
+  image       String?
   maxGuest    Int
   isActive    Boolean @default(true)
 
@@ -170,29 +172,26 @@ model RoomType {
 
   property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
-  rooms           Room[]
-  orderItems      OrderItem[]
-  peakSeasonRates PeakSeasonRate[]
+  roomAvailability RoomAvailability[]
+  orderItems       OrderItem[]
+  peakSeasonRates  PeakSeasonRate[]
 
   @@index([propertyId])
   @@index([name])
   @@map("room_types")
 }
 
-model Room {
-  id     String @id @default(uuid())
-  typeId String
+model RoomAvailability {
+  id         String @id @default(uuid())
+  roomTypeId String
 
-  roomNumber Int
+  date        DateTime
+  isAvailable Boolean  @default(true)
+  note        String?
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  roomType RoomType @relation(fields: [roomTypeId], references: [id], onDelete: Cascade)
 
-  type        RoomType      @relation(fields: [typeId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  bookedRooms bookedRooms[]
-
-  @@unique([typeId, roomNumber])
-  @@map("rooms")
+  @@unique([roomTypeId, date])
 }
 
 model PeakSeasonRate {
@@ -215,21 +214,6 @@ model PeakSeasonRate {
   @@map("peak_season_rates")
 }
 
-model bookedRooms {
-  id          String @id @default(uuid())
-  orderItemId String
-  roomId      String
-
-  checkInDate  DateTime
-  checkOutDate DateTime
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  orderItem OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  room      Room      @relation(fields: [roomId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-}
-
 model OrderItem {
   id         String @id @default(uuid())
   roomTypeId String
@@ -244,9 +228,8 @@ model OrderItem {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  roomType    RoomType      @relation(fields: [roomTypeId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  order       Order         @relation(fields: [orderId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  bookedRooms bookedRooms[]
+  roomType RoomType @relation(fields: [roomTypeId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  order    Order    @relation(fields: [orderId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
   @@map("order_items")
 }

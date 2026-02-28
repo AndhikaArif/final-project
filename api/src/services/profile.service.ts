@@ -8,7 +8,9 @@ import { AppError } from "../errors/app.error.js";
 import { generateToken } from "../utils/token.util.js";
 import type { IExistingUserProfile } from "../types/auth.type.js";
 import { EmailUtil } from "../utils/email.util.js";
+import { FileUpload } from "../utils/file-upload.util.js";
 
+const fileUploadUtil = new FileUpload();
 const emailUtil = new EmailUtil();
 
 export class ProfileService {
@@ -29,20 +31,31 @@ export class ProfileService {
       return {
         id: account.id,
         email: account.email,
-        role: account.role,
+        role: "USER",
+        verificationStatus: account.verificationStatus,
         ...(account.user?.name && { name: account.user.name }),
+        ...(account.user?.profileImage && {
+          profileImage: account.user.profileImage,
+        }),
       };
     }
 
     return {
       id: account.id,
       email: account.email,
-      role: account.role,
+      role: "TENANT",
+      verificationStatus: account.verificationStatus,
       ...(account.tenant?.storeName && {
         storeName: account.tenant.storeName,
       }),
       ...(account.tenant?.storeAddress && {
         storeAddress: account.tenant.storeAddress,
+      }),
+      ...(account.tenant?.logo && {
+        logo: account.tenant.logo,
+      }),
+      ...(account.tenant?.isApproved !== undefined && {
+        isApproved: account.tenant.isApproved,
       }),
     };
   }
@@ -57,7 +70,6 @@ export class ProfileService {
   ) {
     const account = await prisma.authAccount.findUnique({
       where: { id: authAccountId },
-      include: { user: true, tenant: true },
     });
 
     if (!account) {
@@ -75,15 +87,11 @@ export class ProfileService {
       });
     }
 
-    if (
-      account.role === "TENANT" &&
-      !payload.storeName &&
-      !payload.storeAddress
-    ) {
-      throw new AppError(400, "No data to update");
-    }
-
     if (account.role === "TENANT") {
+      if (!payload.storeName && !payload.storeAddress) {
+        throw new AppError(400, "No data to update");
+      }
+
       await prisma.tenant.update({
         where: { authAccountId },
         data: {
@@ -104,24 +112,19 @@ export class ProfileService {
 
     if (!account) throw new AppError(404, "User not found");
 
-    const result = await cloudinary.uploader.upload(file.path, {
-      folder: "profiles",
-    });
-
-    // hapus file lokal setelah upload
-    await fs.unlink(file.path);
+    const imageUrl = await fileUploadUtil.uploadSingle(file.path);
 
     if (account.role === "USER") {
       await prisma.user.update({
         where: { authAccountId },
-        data: { profileImage: result.secure_url },
+        data: { profileImage: imageUrl },
       });
     }
 
     if (account.role === "TENANT") {
       await prisma.tenant.update({
         where: { authAccountId },
-        data: { logo: result.secure_url },
+        data: { logo: imageUrl },
       });
     }
 

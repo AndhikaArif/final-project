@@ -6,11 +6,21 @@ export class AuthValidation {
     .object({
       email: z.email("Invalid email format"),
       role: z.enum(Role),
-      name: z.string().trim().min(1, "Name is required"),
+      name: z.string().trim().optional(),
       storeName: z.string().trim().optional(),
       storeAddress: z.string().trim().optional(),
     })
     .superRefine((data, ctx) => {
+      if (data.role === "USER") {
+        if (!data.name) {
+          ctx.addIssue({
+            code: "custom",
+            message: "Name is required for user",
+            path: ["name"],
+          });
+        }
+      }
+
       if (data.role === "TENANT") {
         if (!data.storeName) {
           ctx.addIssue({
@@ -32,7 +42,7 @@ export class AuthValidation {
 
   static verifyEmailSchema = z.object({
     token: z.string().min(1, "Token is required"),
-    password: z.string().min(8, "Password must be at least 8 characters"),
+    password: z.string().min(5, "Password must be at least 5 characters"),
   });
 
   static loginSchema = z.object({
@@ -80,7 +90,7 @@ export class AuthValidation {
     newPassword: z
       .string()
       .trim()
-      .min(8, "Password must be at least 8 characters"),
+      .min(5, "Password must be at least 5 characters"),
   });
 
   static resendVerificationSchema = z.object({

@@ -60,13 +60,13 @@ export class CancelOrderService {
       }
 
       //    RELEASE BOOKED ROOMS
-      await tx.bookedRooms.deleteMany({
-        where: {
-          orderItem: {
-            orderId: id,
-          },
-        },
-      });
+      // await tx.bookedRooms.deleteMany({
+      //   where: {
+      //     orderItem: {
+      //       orderId: id,
+      //     },
+      //   },
+      // });
     });
 
     return { message: "Order has been cancelled" };

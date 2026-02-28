@@ -1,7 +1,7 @@
 import { prisma } from "../libs/prisma.lib.js";
 import { Prisma, StatusOrder } from "../generated/prisma/client.js";
 import { AppError } from "../errors/app.error.js";
-import { type ICreateOrderItem } from "../types/order-item.js";
+import { type ICreateOrderItem } from "../types/order-item.d.js";
 
 export class OrderService {
   async createOrder(userId: string, items: ICreateOrderItem[]) {

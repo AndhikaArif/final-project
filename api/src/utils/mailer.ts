@@ -18,7 +18,12 @@ export async function sendEmail({
     html,
   });
 
+  console.log("RESEND KEY:", process.env.RESEND_API_KEY);
+  console.log("EMAIL FROM:", process.env.EMAIL_FROM);
+
   if (result.error) {
+    console.error("RESEND ERROR:", result.error);
+
     console.error("EMAIL_FAILED", result.error);
     throw new Error("Failed to send email");
   }

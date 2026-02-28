@@ -17,7 +17,7 @@ export class EmailUtil {
   }
 
   async sendVerificationEmail(email: string, token: string) {
-    const verifyLink = `${process.env.APP_URL}/verify-email?token=${token}`;
+    const verifyLink = `${process.env.WEB_DOMAIN}/verify-email?token=${token}`;
 
     const html = await this.renderTemplate("verify-email", {
       verifyLink,
@@ -31,7 +31,7 @@ export class EmailUtil {
   }
 
   async sendResetPasswordEmail(email: string, token: string) {
-    const resetLink = `${process.env.APP_URL}/reset-password/confirm?token=${token}`;
+    const resetLink = `${process.env.WEB_DOMAIN}/reset-password?token=${token}`;
 
     const html = await this.renderTemplate("reset-password", {
       resetLink,

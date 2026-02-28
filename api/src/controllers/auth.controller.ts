@@ -17,12 +17,9 @@ export class AuthController {
   async register(req: Request, res: Response, next: NextFunction) {
     try {
       const payload = AuthValidation.registerSchema.parse(req.body);
+      const result = await authService.register(payload);
 
-      await authService.register(payload);
-
-      res.status(201).json({
-        message: "Verification email sent. Please check your inbox.",
-      });
+      res.status(201).json(result);
     } catch (error) {
       next(error);
     }
@@ -51,15 +48,17 @@ export class AuthController {
       const token = signJwt({
         authAccountId: result.authAccountId,
         role: result.role,
+        tokenVersion: result.tokenVersion,
       });
 
       res.cookie("authenticationToken", token, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
-        sameSite: "strict",
+        sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 hari
       });
 
-      res.json({
+      res.status(200).json({
         message: "Login success",
         role: result.role,
         profile: result.profile,
@@ -103,12 +102,19 @@ export class AuthController {
       const token = signJwt({
         authAccountId: result.authAccountId,
         role: result.role,
+        tokenVersion: result.tokenVersion,
+      });
+
+      res.cookie("authenticationToken", token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 hari
       });
 
       res.status(201).json({
         message: "Social register success",
         role: result.role,
-        token,
       });
     } catch (err) {
       next(err);
@@ -146,12 +152,19 @@ export class AuthController {
       const token = signJwt({
         authAccountId: result.authAccountId,
         role: result.role,
+        tokenVersion: result.tokenVersion,
+      });
+
+      res.cookie("authenticationToken", token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 hari
       });
 
       res.status(200).json({
         message: "Social login success",
         role: result.role,
-        token,
       });
     } catch (err) {
       next(err);
@@ -178,6 +191,12 @@ export class AuthController {
 
       const result = await passwordService.resetPassword(payload);
 
+      res.clearCookie("authenticationToken", {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+      });
+
       res.json(result);
     } catch (error) {
       next(error);
@@ -196,5 +215,15 @@ export class AuthController {
     } catch (err) {
       next(err);
     }
+  }
+
+  async logout(req: Request, res: Response) {
+    res.clearCookie("authenticationToken", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+    });
+
+    res.json({ message: "Logout successful" });
   }
 }
