@@ -52,27 +52,27 @@ router.use(
 /* ===== CATEGORY ===== */
 
 router.post(
-  "/categories",
+  "/tenant/categories",
   validate(PropertySchema.createCategory, "body"),
   categoryController.createCategory,
 );
 
 router.put(
-  "/categories/:id",
+  "/tenant/categories/:id",
   validate(PropertySchema.idParam, "params"),
   validate(PropertySchema.updateCategory, "body"),
   categoryController.updateCategory,
 );
 
 router.delete(
-  "/categories/:id",
+  "/tenant/categories/:id",
   validate(PropertySchema.idParam, "params"),
   categoryController.deleteCategory,
 );
 
-router.get("/categories", categoryController.getCategories);
+router.get("/tenant/categories", categoryController.getCategories);
 
-/* ===== TENANT PROPERTY ===== */
+/* ===== PROPERTY ===== */
 
 router.get("/tenant/properties", propertyController.getTenantProperties);
 
@@ -100,27 +100,27 @@ router.delete(
 /* ===== ROOM ===== */
 
 router.post(
-  "/properties/:propertyId/rooms",
+  "/tenant/properties/:propertyId/rooms",
   validate(PropertySchema.propertyIdParam, "params"),
   validate(PropertySchema.createRoom, "body"),
   roomController.createRoom,
 );
 
 router.put(
-  "/rooms/:id",
+  "/tenant/properties/rooms/:id",
   validate(PropertySchema.idParam, "params"),
   validate(PropertySchema.updateRoom, "body"),
   roomController.updateRoom,
 );
 
 router.delete(
-  "/rooms/:id",
+  "/tenant/properties/rooms/:id",
   validate(PropertySchema.idParam, "params"),
   roomController.deleteRoom,
 );
 
 router.get(
-  "/properties/:propertyId/rooms",
+  "/tenant/properties/:propertyId/rooms",
   validate(PropertySchema.propertyIdParam, "params"),
   roomController.getRoomsByProperty,
 );
@@ -128,20 +128,20 @@ router.get(
 /* ===== PEAK SEASON ===== */
 
 router.post(
-  "/peak-season",
+  "/tenant/peak-season",
   validate(PropertySchema.createPeakSeason, "body"),
   peakSeasonController.createPeakSeason,
 );
 
 router.put(
-  "/peak-season/:id",
+  "/tenant/peak-season/:id",
   validate(PropertySchema.idParam, "params"),
   validate(PropertySchema.updatePeakSeason, "body"),
   peakSeasonController.updatePeakSeason,
 );
 
 router.delete(
-  "/peak-season/:id",
+  "/tenant/peak-season/:id",
   validate(PropertySchema.idParam, "params"),
   peakSeasonController.deletePeakSeason,
 );

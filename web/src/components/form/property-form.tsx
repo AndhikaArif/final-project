@@ -29,7 +29,7 @@ export default function PropertyForm({
   // Load categories
   useEffect(() => {
     axios
-      .get(`${process.env.NEXT_PUBLIC_API_DOMAIN}/api/categories`, {
+      .get(`${process.env.NEXT_PUBLIC_API_DOMAIN}/api/tenant/categories`, {
         withCredentials: true,
       })
       .then((res) => setCategories(res.data?.data || []))

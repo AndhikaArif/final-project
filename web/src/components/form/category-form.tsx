@@ -26,14 +26,14 @@ export default function CategoryForm({ editing, onSuccess }: Props) {
 
       if (editing) {
         await axios.put(
-          `${process.env.NEXT_PUBLIC_API_DOMAIN}/api/categories/${editing.id}`,
+          `${process.env.NEXT_PUBLIC_API_DOMAIN}/api/tenant/categories/${editing.id}`,
           { name },
           { withCredentials: true },
         );
         toast.success("Category updated successfully");
       } else {
         await axios.post(
-          `${process.env.NEXT_PUBLIC_API_DOMAIN}/api/categories`,
+          `${process.env.NEXT_PUBLIC_API_DOMAIN}/api/tenant/categories`,
           { name },
           { withCredentials: true },
         );

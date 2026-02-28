@@ -22,7 +22,7 @@ export default function CategoryPage() {
     try {
       setLoading(true);
       const res = await axios.get(
-        `${process.env.NEXT_PUBLIC_API_DOMAIN}/api/categories`,
+        `${process.env.NEXT_PUBLIC_API_DOMAIN}/api/tenant/categories`,
         { withCredentials: true },
       );
 
@@ -58,7 +58,7 @@ export default function CategoryPage() {
       setDeletingId(id);
 
       await axios.delete(
-        `${process.env.NEXT_PUBLIC_API_DOMAIN}/api/categories/${id}`,
+        `${process.env.NEXT_PUBLIC_API_DOMAIN}/api/tenant/categories/${id}`,
         { withCredentials: true },
       );
 
