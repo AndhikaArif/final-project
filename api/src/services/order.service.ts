@@ -326,6 +326,13 @@ export class OrderService {
       },
       include: {
         orderItems: {
+          ...(currentUser.type === "TENANT" && {
+            where: {
+              roomType: {
+                property: { tenantId: currentUser.id },
+              },
+            },
+          }),
           include: {
             roomType: {
               include: {

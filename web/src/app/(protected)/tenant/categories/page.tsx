@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 import axios from "axios";
-import CategoryForm from "@/components/category-form";
-import CategoryTable from "@/components/category-table";
+import CategoryForm from "@/components/form/category-form";
+import CategoryTable from "@/components/table/category-table";
 import LoadingScreen from "@/components/loading-screen";
 import toast from "react-hot-toast";
 

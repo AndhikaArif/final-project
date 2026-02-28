@@ -3,9 +3,11 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
 import toast from "react-hot-toast";
+
 import LoadingScreen from "@/components/loading-screen";
-import PropertyForm from "@/components/property-form";
-import PropertyTable from "@/components/property-table";
+import PropertyForm from "@/components/form/property-form";
+import PropertyTable from "@/components/table/property-table";
+import { confirmDelete } from "@/utils/confirm-delete.util";
 
 export interface Property {
   id: string;
@@ -58,32 +60,34 @@ export default function PropertyPage() {
     fetchProperties();
   }, []);
 
-  const handleDelete = async (id: string) => {
-    try {
-      setDeletingId(id);
+  const handleDelete = (id: string) => {
+    confirmDelete(async () => {
+      try {
+        setDeletingId(id);
 
-      await axios.delete(
-        `${process.env.NEXT_PUBLIC_API_DOMAIN}/api/tenant/properties/${id}`,
-        { withCredentials: true },
-      );
+        await axios.delete(
+          `${process.env.NEXT_PUBLIC_API_DOMAIN}/api/tenant/properties/${id}`,
+          { withCredentials: true },
+        );
 
-      toast.success("Property deleted");
-      setProperties((prev) => prev.filter((p) => p.id !== id));
-    } catch (err) {
-      if (axios.isAxiosError(err)) {
-        if (!err.response) {
-          toast.error("Server is not reachable");
-        } else if (err.response.status >= 500) {
-          toast.error("Internal server error");
+        toast.success("Property deleted");
+        setProperties((prev) => prev.filter((p) => p.id !== id));
+      } catch (err) {
+        if (axios.isAxiosError(err)) {
+          if (!err.response) {
+            toast.error("Server is not reachable");
+          } else if (err.response.status >= 500) {
+            toast.error("Internal server error");
+          } else {
+            toast.error(err.response.data?.message || "Delete failed");
+          }
         } else {
-          toast.error(err.response.data?.message || "Delete failed");
+          toast.error("Unexpected error occurred");
         }
-      } else {
-        toast.error("Unexpected error occurred");
+      } finally {
+        setDeletingId(null);
       }
-    } finally {
-      setDeletingId(null);
-    }
+    }, "Delete this property permanently?");
   };
 
   return (

@@ -1,9 +1,11 @@
 import { type Request, type Response, type NextFunction } from "express";
 import { OrderService } from "../services/order.service.js";
+import { CancelOrderService } from "../services/cancel-order.service.js";
 import { type ICreateOrderItem } from "../types/order-item.js";
 import { StatusOrder } from "../generated/prisma/enums.js";
 
 const orderService = new OrderService();
+const cancelOrderService = new CancelOrderService();
 
 export class OrderController {
   async createOrder(req: Request, res: Response, next: NextFunction) {
@@ -71,6 +73,19 @@ export class OrderController {
       const order = await orderService.getOrderById(id, currentUser);
 
       res.status(200).json(order);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async cancelOrder(req: Request, res: Response, next: NextFunction) {
+    try {
+      const id = String(req.params.id);
+      const currentUser = req.currentUser;
+
+      const result = await cancelOrderService.cancelOrder(id, currentUser);
+
+      res.status(200).json(result);
     } catch (error) {
       next(error);
     }

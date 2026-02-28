@@ -15,86 +15,114 @@ export class RoomService {
   ) {
     const tenantId = await TenantResolverService.getTenantId(authAccountId);
 
-    const property = await prisma.property.findFirst({
-      where: { id: propertyId, tenantId },
-    });
+    return prisma.$transaction(async (tx) => {
+      const property = await tx.property.findFirst({
+        where: { id: propertyId, tenantId },
+      });
 
-    if (!property) {
-      throw new AppError(
-        403,
-        "You are not allowed to add room to this property",
-      );
-    }
+      if (!property) {
+        throw new AppError(
+          403,
+          "You are not allowed to add room to this property",
+        );
+      }
 
-    const existing = await prisma.roomType.findFirst({
-      where: {
-        propertyId,
-        name: data.name,
-      },
-    });
+      const duplicate = await tx.roomType.findFirst({
+        where: {
+          propertyId,
+          name: data.name,
+        },
+      });
 
-    if (existing) {
-      throw new AppError(409, "Room name already exists in this property");
-    }
+      if (duplicate) {
+        throw new AppError(409, "Room name already exists in this property");
+      }
 
-    return prisma.roomType.create({
-      data: {
-        propertyId,
-        name: data.name,
-        basePrice: data.price,
-        description: data.description,
-        totalRoom: data.totalRoom,
-      },
+      return tx.roomType.create({
+        data: {
+          propertyId,
+          name: data.name,
+          basePrice: data.price,
+          description: data.description,
+          totalRoom: data.totalRoom,
+        },
+      });
     });
   }
 
   async updateRoom(id: string, authAccountId: string, data: UpdateRoomDTO) {
     const tenantId = await TenantResolverService.getTenantId(authAccountId);
 
-    const room = await prisma.roomType.findFirst({
-      where: {
-        id,
-        property: {
-          tenantId,
+    return prisma.$transaction(async (tx) => {
+      const room = await tx.roomType.findFirst({
+        where: {
+          id,
+          property: { tenantId },
         },
-      },
-    });
+        include: { property: true },
+      });
 
-    if (!room) {
-      throw new AppError(403, "You are not allowed to update this room");
-    }
+      if (!room) {
+        throw new AppError(403, "You are not allowed to update this room");
+      }
 
-    return prisma.roomType.update({
-      where: { id },
-      data: {
-        ...(data.name !== undefined && { name: data.name }),
-        ...(data.price !== undefined && { basePrice: data.price }),
-        ...(data.description !== undefined && {
-          description: data.description,
-        }),
-        ...(data.totalRoom !== undefined && { totalRoom: data.totalRoom }),
-      },
+      if (data.name) {
+        const duplicate = await tx.roomType.findFirst({
+          where: {
+            propertyId: room.propertyId,
+            name: data.name,
+            NOT: { id },
+          },
+        });
+
+        if (duplicate) {
+          throw new AppError(409, "Room name already exists in this property");
+        }
+      }
+
+      return tx.roomType.update({
+        where: { id },
+        data: {
+          ...(data.name !== undefined && { name: data.name }),
+          ...(data.price !== undefined && { basePrice: data.price }),
+          ...(data.description !== undefined && {
+            description: data.description,
+          }),
+          ...(data.totalRoom !== undefined && { totalRoom: data.totalRoom }),
+        },
+      });
     });
   }
 
   async deleteRoom(id: string, authAccountId: string) {
     const tenantId = await TenantResolverService.getTenantId(authAccountId);
 
-    const room = await prisma.roomType.findFirst({
-      where: {
-        id,
-        property: {
-          tenantId,
+    return prisma.$transaction(async (tx) => {
+      const room = await tx.roomType.findFirst({
+        where: {
+          id,
+          property: { tenantId },
         },
-      },
-    });
+      });
 
-    if (!room) {
-      throw new AppError(403, "You are not allowed to delete this room");
-    }
+      if (!room) {
+        throw new AppError(403, "You are not allowed to delete this room");
+      }
 
-    return prisma.roomType.delete({
-      where: { id },
+      const hasOrders = await tx.orderItem.findFirst({
+        where: { roomTypeId: id },
+      });
+
+      if (hasOrders) {
+        throw new AppError(
+          400,
+          "Room cannot be deleted because it already has bookings",
+        );
+      }
+
+      return tx.roomType.delete({
+        where: { id },
+      });
     });
   }
 
