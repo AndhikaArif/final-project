@@ -1,7 +1,7 @@
 import { prisma } from "../libs/prisma.lib.js";
 import { Prisma, StatusOrder } from "../generated/prisma/client.js";
 import { AppError } from "../errors/app.error.js";
-import { type ICreateOrderItem } from "../types/order-item.js";
+import { type ICreateOrderItem } from "../types/order-item.d.js";
 
 export class OrderService {
   async createOrder(userId: string, items: ICreateOrderItem[]) {
@@ -36,6 +36,13 @@ export class OrderService {
       const now = new Date();
 
       for (const data of items) {
+        // ROW LEVEL LOCKING
+        await tx.$queryRaw`
+        SELECT id FROM "RoomType"
+        WHERE id = ${data.roomTypeId}
+        FOR UPDATE
+      `;
+
         // ROOM TYPE ID
         const roomType = await tx.roomType.findUnique({
           where: { id: data.roomTypeId },
@@ -154,7 +161,7 @@ export class OrderService {
       return tx.order.create({
         data: {
           userId,
-          expiredAt: new Date(now.getTime() + 15 * 60 * 1000),
+          expiredAt: new Date(now.getTime() + 60 * 60 * 1000),
           totalAmount: orderTotalAmount,
           orderItems: {
             create: orderItemsData,

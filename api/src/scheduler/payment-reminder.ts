@@ -2,7 +2,6 @@ import cron from "node-cron";
 import { prisma } from "../libs/prisma.lib.js";
 
 export const paymentReminderScheduler = () => {
-  // jalan tiap 1 menit
   cron.schedule("* * * * *", async () => {
     console.log("Running payment reminder job...");
 
@@ -10,11 +9,7 @@ export const paymentReminderScheduler = () => {
 
     try {
       await prisma.$transaction(async (tx) => {
-        /**
-         * ===============================
-         * 1️⃣ REMINDER (10 menit sebelum expired)
-         * ===============================
-         */
+        // REMINDER (10 MINUTES BEFORE)
         const reminderTime = new Date(now.getTime() + 10 * 60 * 1000);
 
         const ordersToRemind = await tx.order.findMany({
@@ -40,7 +35,7 @@ export const paymentReminderScheduler = () => {
             `Send payment reminder to ${order.user.authAccount.email}`,
           );
 
-          // TODO: kirim email / notification di sini
+          // TODO: kirim email / notification ?
 
           await tx.order.update({
             where: { id: order.id },
@@ -48,11 +43,7 @@ export const paymentReminderScheduler = () => {
           });
         }
 
-        /**
-         * ===============================
-         * 2️⃣ AUTO EXPIRE
-         * ===============================
-         */
+        // AUTO EXPIRED
         const expiredOrders = await tx.order.findMany({
           where: {
             status: "WAITING_PAYMENT",
@@ -62,38 +53,41 @@ export const paymentReminderScheduler = () => {
           },
           include: {
             payments: true,
+            orderItems: true,
           },
         });
 
         for (const order of expiredOrders) {
           console.log(`Expiring order ${order.id}`);
 
-          // Update order status
+          // UPDATE ORDER STATUS
           await tx.order.update({
             where: { id: order.id },
             data: { status: "EXPIRED" },
           });
 
-          // Update payment status jika ada
-          if (order.payments) {
-            await tx.payment.updateMany({
-              where: {
-                orderId: order.id,
-                status: "PENDING",
-              },
+          // UPDATE PAYMENT STATUS
+          await tx.payment.updateMany({
+            where: {
+              orderId: order.id,
+              status: "PENDING",
+            },
+            data: {
+              status: "EXPIRED",
+            },
+          });
+
+          // RELEASE TOTAL ROOM
+          for (const item of order.orderItems) {
+            await tx.roomType.update({
+              where: { id: item.roomTypeId },
               data: {
-                status: "EXPIRED",
+                totalRoom: {
+                  increment: item.roomQuantity,
+                },
               },
             });
           }
-          // Release booked room
-          await tx.bookedRooms.deleteMany({
-            where: {
-              orderItem: {
-                orderId: order.id,
-              },
-            },
-          });
         }
       });
     } catch (error) {

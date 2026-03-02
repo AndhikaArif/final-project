@@ -4,7 +4,7 @@ import {
   type ICreatePayment,
   type IUpdatePaymentProof,
   type IUpdatePaymentStatus,
-} from "../types/payment.js";
+} from "../types/payment.d.js";
 import { prisma } from "../libs/prisma.lib.js";
 import { Prisma } from "../generated/prisma/client.js";
 import { FileUpload } from "../utils/file-upload.util.js";

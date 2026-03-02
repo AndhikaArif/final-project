@@ -1,7 +1,7 @@
 import { type Request, type Response, type NextFunction } from "express";
 import { OrderService } from "../services/order.service.js";
 import { CancelOrderService } from "../services/cancel-order.service.js";
-import { type ICreateOrderItem } from "../types/order-item.js";
+import { type ICreateOrderItem } from "../types/order-item.d.js";
 import { StatusOrder } from "../generated/prisma/enums.js";
 
 const orderService = new OrderService();

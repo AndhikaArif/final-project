@@ -1,7 +1,5 @@
 import { type Request, type Response, type NextFunction } from "express";
 import { PaymentService } from "../services/payment.service.js";
-import { json } from "zod";
-import App from "../app.js";
 import { AppError } from "../errors/app.error.js";
 
 const paymentService = new PaymentService();
