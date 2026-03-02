@@ -33,7 +33,7 @@ export class PaymentService {
     }
 
     // EXISTING PAYMENT
-    const existingPayment = await prisma.payment.findUnique({
+    const existingPayment = await prisma.payment.findFirst({
       where: { orderId: order.id },
     });
 

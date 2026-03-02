@@ -45,13 +45,13 @@ export class CancelOrderService {
     }
 
     await prisma.$transaction(async (tx) => {
-      // 1️⃣ UPDATE ORDER
+      // UPDATE ORDER
       await tx.order.update({
         where: { id },
         data: { status: "CANCELLED" },
       });
 
-      // 2️⃣ UPDATE PAYMENT
+      // UPDATE PAYMENT
       if (order.payments.length > 0) {
         await tx.payment.updateMany({
           where: {
@@ -64,7 +64,7 @@ export class CancelOrderService {
         });
       }
 
-      // 3️⃣ RESTORE ROOM STOCK
+      // RELEASE TOTAL ROOM
       for (const item of order.orderItems) {
         await tx.roomType.update({
           where: { id: item.roomTypeId },

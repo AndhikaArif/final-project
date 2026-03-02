@@ -20,64 +20,115 @@ export class AuthService {
       where: { email: payload.email },
     });
 
+    // ===============================
+    // CASE 1: EMAIL SUDAH ADA
+    // ===============================
     if (existing) {
-      throw new AppError(400, "Email already registered");
-    }
-
-    // Create AuthAccount
-    const authAccount = await prisma.authAccount.create({
-      data: {
-        email: payload.email,
-        role: payload.role,
-      },
-    });
-
-    // Create profile based on role user
-    if (payload.role === "USER") {
-      if (!payload.name) {
-        throw new AppError(400, "Name is required for user");
+      if (existing.verificationStatus === "VERIFIED") {
+        throw new AppError(400, "Email already registered");
       }
 
-      await prisma.user.create({
+      const rawToken = generateToken();
+      const hashedToken = createHash("sha256").update(rawToken).digest("hex");
+
+      await prisma.verificationToken.deleteMany({
+        where: { authAccountId: existing.id },
+      });
+
+      await prisma.verificationToken.create({
         data: {
-          authAccountId: authAccount.id,
-          name: payload.name,
+          token: hashedToken,
+          expiredAt: new Date(Date.now() + 60 * 60 * 1000),
+          authAccountId: existing.id,
         },
       });
-    }
 
-    // Create profile based on role tenant
-    if (payload.role === "TENANT") {
-      if (!payload.storeName) {
-        throw new AppError(400, "Store name is required for tenant");
+      try {
+        await emailUtil.sendVerificationEmail(payload.email, rawToken);
+
+        return {
+          message: "Verification email resent",
+          emailSent: true,
+        };
+      } catch (error) {
+        console.error("Email failed:", error);
+
+        return {
+          message:
+            "Account already exists but failed to resend email. Please try again.",
+          emailSent: false,
+        };
       }
-
-      await prisma.tenant.create({
-        data: {
-          authAccountId: authAccount.id,
-          storeName: payload.storeName,
-          storeAddress: payload.storeAddress ?? null,
-        },
-      });
     }
 
-    // Create verification token
+    // ===============================
+    // CASE 2: EMAIL BELUM ADA
+    // ===============================
     const rawToken = generateToken();
     const hashedToken = createHash("sha256").update(rawToken).digest("hex");
 
-    await prisma.verificationToken.create({
-      data: {
-        token: hashedToken,
-        expiredAt: new Date(Date.now() + 60 * 60 * 1000), // 1hour
-        authAccountId: authAccount.id,
-      },
+    const authAccount = await prisma.$transaction(async (tx) => {
+      const account = await tx.authAccount.create({
+        data: {
+          email: payload.email,
+          role: payload.role,
+        },
+      });
+
+      if (payload.role === "USER") {
+        if (!payload.name) {
+          throw new AppError(400, "Name is required for user");
+        }
+
+        await tx.user.create({
+          data: {
+            authAccountId: account.id,
+            name: payload.name,
+          },
+        });
+      }
+
+      if (payload.role === "TENANT") {
+        if (!payload.storeName) {
+          throw new AppError(400, "Store name is required for tenant");
+        }
+
+        await tx.tenant.create({
+          data: {
+            authAccountId: account.id,
+            storeName: payload.storeName,
+            storeAddress: payload.storeAddress ?? null,
+          },
+        });
+      }
+
+      await tx.verificationToken.create({
+        data: {
+          token: hashedToken,
+          expiredAt: new Date(Date.now() + 60 * 60 * 1000),
+          authAccountId: account.id,
+        },
+      });
+
+      return account;
     });
 
-    await emailUtil.sendVerificationEmail(payload.email, rawToken);
+    try {
+      await emailUtil.sendVerificationEmail(payload.email, rawToken);
 
-    return {
-      message: "Verification email sent",
-    };
+      return {
+        message: "Verification email sent",
+        emailSent: true,
+      };
+    } catch (error) {
+      console.error("Email failed:", error);
+
+      return {
+        message:
+          "Account created but failed to send verification email. Please resend verification.",
+        emailSent: false,
+      };
+    }
   }
 
   async registerSocial(payload: IRegisterSocialPayload) {
@@ -87,6 +138,10 @@ export class AuthService {
     });
 
     if (existing) {
+      if (existing.provider !== payload.provider) {
+        throw new AppError(403, "Invalid auth provider");
+      }
+
       if (existing && existing.role !== payload.role) {
         throw new AppError(403, "Unauthorized role access");
       }
@@ -94,49 +149,55 @@ export class AuthService {
       return {
         authAccountId: existing.id,
         role: existing.role,
+        tokenVersion: existing.tokenVersion,
       };
     }
 
-    const account = await prisma.authAccount.create({
-      data: {
-        email: payload.email,
-        role: payload.role,
-        provider: payload.provider,
-        verificationStatus: "VERIFIED",
-      },
+    const result = await prisma.$transaction(async (tx) => {
+      const account = await tx.authAccount.create({
+        data: {
+          email: payload.email,
+          role: payload.role,
+          provider: payload.provider,
+          verificationStatus: "VERIFIED",
+        },
+      });
+
+      if (payload.role === "USER") {
+        if (!payload.name) {
+          throw new AppError(400, "Name is required");
+        }
+
+        await tx.user.create({
+          data: {
+            authAccountId: account.id,
+            name: payload.name,
+          },
+        });
+      }
+
+      if (payload.role === "TENANT") {
+        if (!payload.storeName) {
+          throw new AppError(400, "Store name is required");
+        }
+
+        await tx.tenant.create({
+          data: {
+            authAccountId: account.id,
+            storeName: payload.storeName,
+            storeAddress: payload.storeAddress ?? null,
+          },
+        });
+      }
+
+      return {
+        authAccountId: account.id,
+        role: account.role,
+        tokenVersion: account.tokenVersion,
+      };
     });
 
-    if (payload.role === "USER") {
-      if (!payload.name) {
-        throw new AppError(400, "Name is required");
-      }
-
-      await prisma.user.create({
-        data: {
-          authAccountId: account.id,
-          name: payload.name,
-        },
-      });
-    }
-
-    if (payload.role === "TENANT") {
-      if (!payload.storeName) {
-        throw new AppError(400, "Store name is required");
-      }
-
-      await prisma.tenant.create({
-        data: {
-          authAccountId: account.id,
-          storeName: payload.storeName,
-          storeAddress: payload.storeAddress ?? null,
-        },
-      });
-    }
-
-    return {
-      authAccountId: account.id,
-      role: account.role,
-    };
+    return result;
   }
 
   async loginSocial(payload: ILoginSocialPayload) {
@@ -163,6 +224,10 @@ export class AuthService {
       throw new AppError(403, "Unauthorized role access");
     }
 
+    if (authAccount.verificationStatus !== "VERIFIED") {
+      throw new AppError(403, "Account not verified");
+    }
+
     const profile =
       authAccount.role === "USER" ? authAccount.user : authAccount.tenant;
 
@@ -173,6 +238,7 @@ export class AuthService {
     return {
       authAccountId: authAccount.id,
       role: authAccount.role,
+      tokenVersion: authAccount.tokenVersion,
       profile,
     };
   }
@@ -228,6 +294,7 @@ export class AuthService {
     return {
       authAccountId: authAccount.id,
       role: authAccount.role,
+      tokenVersion: authAccount.tokenVersion,
       profile,
     };
   }

@@ -6,10 +6,15 @@ export class FileUpload {
   async uploadToCloudinary(filePath: string) {
     try {
       const uploadResult = await cloudinary.uploader.upload(filePath);
-
       return uploadResult.secure_url;
+    } catch (error) {
+      throw error;
     } finally {
-      await fs.unlink(filePath);
+      try {
+        await fs.unlink(filePath);
+      } catch (err) {
+        console.error("Failed to delete local file:", err);
+      }
     }
   }
 

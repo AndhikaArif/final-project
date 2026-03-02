@@ -30,6 +30,8 @@ export function verifyAuthJs(req: Request, res: Response, next: NextFunction) {
       provider: payload.provider,
     };
 
+    console.log("SECRET:", process.env.AUTHJS_SECRET);
+
     next();
   } catch {
     next(new AppError(401, "Invalid token"));

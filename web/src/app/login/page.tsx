@@ -1,0 +1,165 @@
+"use client";
+
+import { Formik, Form, Field, ErrorMessage } from "formik";
+import { toFormikValidationSchema } from "zod-formik-adapter";
+import { loginSchemaFront } from "@/validation/login.validation";
+import axios from "axios";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/context/auth-context";
+import PasswordField from "@/components/form/passwordField";
+import { useState, useEffect } from "react";
+import LoadingScreen from "@/components/loading-screen";
+import toast from "react-hot-toast";
+
+export default function LoginPage() {
+  const router = useRouter();
+  const { refreshUser } = useAuth();
+  const [globalError, setGlobalError] = useState<string | null>(null);
+  const { user, loading } = useAuth();
+
+  useEffect(() => {
+    if (localStorage.getItem("session-expired")) {
+      toast.error("Session expired, please login again");
+      localStorage.removeItem("session-expired");
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!loading && user) {
+      router.replace("/");
+    }
+  }, [user, loading, router]);
+
+  if (loading) return <LoadingScreen />;
+  if (user) return null;
+
+  return (
+    <main>
+      <div className="max-w-md mx-auto p-6 border rounded-xl mt-10">
+        <h2 className="text-xl font-semibold mb-4">Login</h2>
+
+        <Formik
+          initialValues={{ email: "", password: "" }}
+          validationSchema={toFormikValidationSchema(loginSchemaFront)}
+          onSubmit={async (values, { setSubmitting, setErrors }) => {
+            setGlobalError(null);
+
+            try {
+              await axios.post(
+                `${process.env.NEXT_PUBLIC_API_DOMAIN}/api/auth/login`,
+                values,
+                { withCredentials: true },
+              );
+
+              await refreshUser();
+
+              router.replace("/");
+
+              return;
+            } catch (err: unknown) {
+              if (axios.isAxiosError(err)) {
+                // Tidak ada response (Supabase / API down)
+                if (!err.response) {
+                  setGlobalError(
+                    "The server is experiencing problems. Please try logging in again in a moment.",
+                  );
+                  return;
+                }
+
+                const status = err.response.status;
+
+                //  Username / password salah
+                if (status === 400) {
+                  setErrors({
+                    password: "Invalid email or password",
+                  });
+                  return;
+                }
+
+                if (status === 429) {
+                  setGlobalError("Too many request, please try again later");
+                  return;
+                }
+
+                //  Server error (Supabase error biasanya 500)
+                if (status >= 500) {
+                  setGlobalError(
+                    "The service is currently unavailable. Please try again later.",
+                  );
+                  return;
+                }
+              }
+
+              // fallback
+              setGlobalError("An error occurred. Please try again.");
+            } finally {
+              setSubmitting(false);
+            }
+          }}
+        >
+          {({ isSubmitting }) => {
+            if (isSubmitting) {
+              return <LoadingScreen />;
+            }
+            return (
+              <Form className="flex flex-col gap-4">
+                {/* Error Supabase */}
+                {globalError && (
+                  <div className="bg-red-100 text-red-600 p-2 rounded text-sm mb-3">
+                    {globalError}
+                  </div>
+                )}
+
+                {/* EMAIL */}
+                <div className="flex flex-col gap-1">
+                  <label className="font-medium">Email</label>
+
+                  <Field
+                    name="email"
+                    placeholder="Email"
+                    className={`border p-2 rounded bg-black text-white`}
+                  />
+
+                  <ErrorMessage
+                    name="email"
+                    component="div"
+                    className="text-red-500 text-sm"
+                  />
+                </div>
+
+                {/* PASSWORD */}
+                <PasswordField
+                  name="password"
+                  label="Password"
+                  className={"bg-black text-white"}
+                />
+
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className={`p-2 rounded transition duration-300 cursor-pointer ${
+                    isSubmitting
+                      ? "opacity-50 cursor-not-allowed"
+                      : "hover:scale-110"
+                  } ${"bg-white text-black"}`}
+                >
+                  {isSubmitting ? "Processing..." : "Login"}
+                </button>
+
+                <div className="text-sm text-right mt-2">
+                  <button
+                    type="button"
+                    onClick={() => router.push("/forgot-password")}
+                    className="text-blue-600 hover:underline cursor-pointer"
+                  >
+                    Forgot password?
+                  </button>
+                </div>
+              </Form>
+            );
+          }}
+        </Formik>
+      </div>
+    </main>
+  );
+}
