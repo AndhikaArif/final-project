@@ -3,9 +3,9 @@ import { z } from "zod";
 export const socialRegisterSchema = z
   .object({
     role: z.enum(["USER", "TENANT"]),
-    name: z.string(),
-    storeName: z.string(),
-    storeAddress: z.string(),
+    name: z.string().optional(),
+    storeName: z.string().optional(),
+    storeAddress: z.string().optional(),
   })
   .superRefine((data, ctx) => {
     if (data.role === "USER") {
