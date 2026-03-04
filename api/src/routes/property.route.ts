@@ -9,6 +9,7 @@ import { RoomController } from "../controllers/room.controller.js";
 import { PeakSeasonController } from "../controllers/peak-season.controller.js";
 import { PropertyController } from "../controllers/property.controller.js";
 import { CategoryController } from "../controllers/category.controller.js";
+import { RoomAvailabilityController } from "../controllers/room-availability.controller.js";
 
 import { PropertySchema } from "../validations/property.validation.js";
 
@@ -18,6 +19,7 @@ const propertyController = new PropertyController();
 const roomController = new RoomController();
 const peakSeasonController = new PeakSeasonController();
 const categoryController = new CategoryController();
+const roomAvailabilityController = new RoomAvailabilityController();
 
 /* ================= PUBLIC ================= */
 
@@ -106,42 +108,76 @@ router.post(
   roomController.createRoom,
 );
 
-router.put(
-  "/tenant/properties/rooms/:id",
-  validate(PropertySchema.idParam, "params"),
-  validate(PropertySchema.updateRoom, "body"),
-  roomController.updateRoom,
-);
-
-router.delete(
-  "/tenant/properties/rooms/:id",
-  validate(PropertySchema.idParam, "params"),
-  roomController.deleteRoom,
-);
-
 router.get(
   "/tenant/properties/:propertyId/rooms",
   validate(PropertySchema.propertyIdParam, "params"),
   roomController.getRoomsByProperty,
 );
 
+router.put(
+  "/tenant/rooms/:id",
+  validate(PropertySchema.idParam, "params"),
+  validate(PropertySchema.updateRoom, "body"),
+  roomController.updateRoom,
+);
+
+router.delete(
+  "/tenant/rooms/:id",
+  validate(PropertySchema.idParam, "params"),
+  roomController.deleteRoom,
+);
+
+/* ===== ROOM AVAILABILITY ===== */
+
+router.put(
+  "/tenant/rooms/:roomTypeId/availability/range",
+  validate(PropertySchema.setAvailabilityRange, "body"),
+  roomAvailabilityController.setRange,
+);
+
+router.put(
+  "/tenant/rooms/:roomTypeId/availability/single",
+  validate(PropertySchema.updateAvailabilitySingle, "body"),
+  roomAvailabilityController.updateSingle,
+);
+
+router.get(
+  "/tenant/rooms/:roomTypeId/availability",
+  validate(PropertySchema.roomTypeParam, "params"),
+  roomAvailabilityController.getByRoom,
+);
+
+router.delete(
+  "/tenant/rooms/availability/:id",
+  validate(PropertySchema.idParam, "params"),
+  roomAvailabilityController.delete,
+);
+
 /* ===== PEAK SEASON ===== */
 
+router.get(
+  "/tenant/rooms/:roomTypeId/peak-season",
+  validate(PropertySchema.roomTypeParam, "params"),
+  peakSeasonController.getByRoomPeakSeason,
+);
+
 router.post(
-  "/tenant/peak-season",
+  "/tenant/rooms/:roomTypeId/peak-season",
+  validate(PropertySchema.roomTypeParam, "params"),
   validate(PropertySchema.createPeakSeason, "body"),
   peakSeasonController.createPeakSeason,
 );
 
 router.put(
-  "/tenant/peak-season/:id",
-  validate(PropertySchema.idParam, "params"),
+  "/tenant/rooms/:roomTypeId/peak-season/:id",
+  validate(PropertySchema.peakSeasonParam, "params"),
   validate(PropertySchema.updatePeakSeason, "body"),
   peakSeasonController.updatePeakSeason,
 );
 
 router.delete(
-  "/tenant/peak-season/:id",
+  "/tenant/rooms/:roomTypeId/peak-season/:id",
+  validate(PropertySchema.roomTypeParam, "params"),
   validate(PropertySchema.idParam, "params"),
   peakSeasonController.deletePeakSeason,
 );

@@ -6,6 +6,7 @@ import CategoryForm from "@/components/form/category-form";
 import CategoryTable from "@/components/table/category-table";
 import LoadingScreen from "@/components/loading-screen";
 import toast from "react-hot-toast";
+import { confirmDelete } from "@/utils/confirm-delete.util";
 
 export interface Category {
   id: string;
@@ -52,37 +53,39 @@ export default function CategoryPage() {
     fetchCategories();
   }, []);
 
-  const handleDelete = async (id: string) => {
-    try {
-      if (deletingId) return;
-      setDeletingId(id);
+  const handleDelete = (id: string) => {
+    confirmDelete(async () => {
+      try {
+        if (deletingId) return;
+        setDeletingId(id);
 
-      await axios.delete(
-        `${process.env.NEXT_PUBLIC_API_DOMAIN}/api/tenant/categories/${id}`,
-        { withCredentials: true },
-      );
+        await axios.delete(
+          `${process.env.NEXT_PUBLIC_API_DOMAIN}/api/tenant/categories/${id}`,
+          { withCredentials: true },
+        );
 
-      toast.success("Category deleted successfully");
-      await fetchCategories();
+        toast.success("Category deleted successfully");
+        await fetchCategories();
 
-      if (editing?.id === id) {
-        setEditing(null);
-      }
-    } catch (err) {
-      if (axios.isAxiosError(err)) {
-        if (!err.response) {
-          toast.error("Server is not reachable");
-        } else if (err.response.status >= 500) {
-          toast.error("Internal server error");
-        } else {
-          toast.error(err.response.data?.message || "Delete failed");
+        if (editing?.id === id) {
+          setEditing(null);
         }
-      } else {
-        toast.error("Unexpected error occurred");
+      } catch (err) {
+        if (axios.isAxiosError(err)) {
+          if (!err.response) {
+            toast.error("Server is not reachable");
+          } else if (err.response.status >= 500) {
+            toast.error("Internal server error");
+          } else {
+            toast.error(err.response.data?.message || "Delete failed");
+          }
+        } else {
+          toast.error("Unexpected error occurred");
+        }
+      } finally {
+        setDeletingId(null);
       }
-    } finally {
-      setDeletingId(null);
-    }
+    }, "Delete this category permanently?");
   };
 
   return (

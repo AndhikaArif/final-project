@@ -1,36 +1,45 @@
 import type { Request, Response, NextFunction } from "express";
+import { decode } from "next-auth/jwt";
 import { AppError } from "../errors/app.error.js";
-import jwt, { type JwtPayload } from "jsonwebtoken";
 import type { AuthJsProvider } from "../types/auth.type.js";
 
-export function verifyAuthJs(req: Request, res: Response, next: NextFunction) {
-  const token = req.headers.authorization?.replace("Bearer ", "");
-
-  if (!token) {
-    return next(new AppError(401, "Unauthorized"));
-  }
-
-  const secret = process.env.AUTHJS_SECRET;
-  if (!secret) {
-    throw new Error("AUTHJS_SECRET not configured");
-  }
-
+export async function verifyAuthJs(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
   try {
-    const payload = jwt.verify(token, secret) as JwtPayload & {
-      email?: string;
-      provider?: AuthJsProvider;
-    };
+    const authHeader = req.headers.authorization;
 
-    if (!payload.email || !payload.provider) {
+    if (!authHeader?.startsWith("Bearer ")) {
+      return next(new AppError(401, "Unauthorized"));
+    }
+
+    const token = authHeader.split(" ")[1];
+
+    if (!token) {
+      return next(new AppError(401, "Unauthorized"));
+    }
+
+    const secret = process.env.NEXTAUTH_SECRET;
+
+    if (!secret) {
+      throw new Error("AUTHJS_SECRET not configured");
+    }
+
+    const decoded = await decode({
+      token,
+      secret,
+    });
+
+    if (!decoded?.email || !decoded?.provider) {
       return next(new AppError(401, "Invalid token payload"));
     }
 
     req.auth = {
-      email: payload.email,
-      provider: payload.provider,
+      email: decoded.email as string,
+      provider: decoded.provider as AuthJsProvider,
     };
-
-    console.log("SECRET:", process.env.AUTHJS_SECRET);
 
     next();
   } catch {

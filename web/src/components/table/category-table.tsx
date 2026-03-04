@@ -37,7 +37,7 @@ export default function CategoryTable({
               <td className="border p-2 text-center space-x-2">
                 <button
                   onClick={() => onEdit(cat)}
-                  className="bg-yellow-500 text-white px-3 py-1 rounded"
+                  className="bg-yellow-500 text-white hover:bg-yellow-400 px-3 py-1 rounded cursor-pointer"
                 >
                   Edit
                 </button>
@@ -45,7 +45,7 @@ export default function CategoryTable({
                 <button
                   onClick={() => onDelete(cat.id)}
                   disabled={deletingId === cat.id}
-                  className="bg-red-600 text-white px-3 py-1 rounded disabled:opacity-50"
+                  className="bg-red-600 text-white hover:bg-red-500 px-3 py-1 rounded disabled:opacity-50 cursor-pointer"
                 >
                   {deletingId === cat.id ? "Deleting..." : "Delete"}
                 </button>

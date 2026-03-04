@@ -1,13 +1,10 @@
 import type { Metadata } from "next";
 import "./globals.css";
-<<<<<<< HEAD
-import Navbar from "@/components/navbar";
-=======
 import { Toaster } from "react-hot-toast";
->>>>>>> main
 
 import Navbar from "@/components/navbar";
 import { AuthProvider } from "@/context/auth-context";
+import Providers from "@/components/providers";
 
 export const metadata: Metadata = {
   title: "Create Next App",
@@ -22,31 +19,26 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-<<<<<<< HEAD
-        <header className="sticky z-50 top-0">
-          <Navbar />
-        </header>
-        {children}
-=======
-        <AuthProvider>
-          <header className="sticky z-50 top-0">
-            <Navbar />
-          </header>
-          {children}
-          <Toaster
-            position="top-right"
-            toastOptions={{
-              className: "text-sm",
-              success: {
-                style: { background: "#16a34a", color: "white" },
-              },
-              error: {
-                style: { background: "#dc2626", color: "white" },
-              },
-            }}
-          />
-        </AuthProvider>
->>>>>>> main
+        <Providers>
+          <AuthProvider>
+            <header className="sticky z-50 top-0">
+              <Navbar />
+            </header>
+            {children}
+            <Toaster
+              position="top-right"
+              toastOptions={{
+                className: "text-sm",
+                success: {
+                  style: { background: "#16a34a", color: "white" },
+                },
+                error: {
+                  style: { background: "#dc2626", color: "white" },
+                },
+              }}
+            />
+          </AuthProvider>
+        </Providers>
       </body>
     </html>
   );
