@@ -6,13 +6,23 @@ import { z } from "zod";
 import { toFormikValidationSchema } from "zod-formik-adapter";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
+import { useEffect } from "react";
+
+import { useAuth } from "@/context/auth-context";
 
 const forgotPasswordSchema = z.object({
-  email: z.string().email("Invalid email"),
+  email: z.email("Invalid email"),
 });
 
 export default function ForgotPasswordPage() {
   const router = useRouter();
+  const { user, loading } = useAuth();
+
+  useEffect(() => {
+    if (!loading && user?.provider && user.provider !== "EMAIL") {
+      router.replace("/");
+    }
+  }, [user, loading, router]);
 
   return (
     <main className="max-w-md mx-auto p-6 mt-10 border rounded-xl">

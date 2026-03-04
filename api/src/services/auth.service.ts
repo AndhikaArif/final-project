@@ -209,17 +209,17 @@ export class AuthService {
       },
     });
 
-    // ❌ belum pernah daftar → harus register social
+    // Belum pernah daftar → kirim flag
     if (!authAccount) {
-      throw new AppError(404, "Account not registered");
+      return {
+        needsRegistration: true,
+      };
     }
 
-    // 🔒 provider check
     if (authAccount.provider !== payload.provider) {
       throw new AppError(403, "Invalid auth provider");
     }
 
-    // 🔒 role check
     if (authAccount.role !== payload.role) {
       throw new AppError(403, "Unauthorized role access");
     }

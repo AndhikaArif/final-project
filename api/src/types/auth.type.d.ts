@@ -68,6 +68,7 @@ export type IExistingUserProfile =
       id: string;
       email: string;
       role: "USER";
+      provider: AuthProvider;
       verificationStatus: VerificationStatus;
       name?: string;
       profileImage?: string | null;
@@ -76,6 +77,7 @@ export type IExistingUserProfile =
       id: string;
       email: string;
       role: "TENANT";
+      provider: AuthProvider;
       verificationStatus: VerificationStatus;
       storeName?: string;
       storeAddress?: string | null;

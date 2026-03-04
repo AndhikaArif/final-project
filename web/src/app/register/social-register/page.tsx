@@ -1,136 +1,265 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
-import { Formik, Form, Field } from "formik";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { Formik, Form, Field, ErrorMessage } from "formik";
 import axios from "axios";
 import { useSession } from "next-auth/react";
-import { useEffect } from "react";
 import toast from "react-hot-toast";
+import { ZodError } from "zod";
 
-type SocialRegisterForm = {
-  role: "USER" | "TENANT";
-  name?: string;
-  storeName?: string;
-  storeAddress?: string;
-};
+import { socialRegisterSchema } from "@/validation/social-register.validation";
+import { useAuth } from "@/context/auth-context";
+import LoadingScreen from "@/components/loading-screen";
+
+interface ISocialRegisterFormValues {
+  name: string;
+  storeName: string;
+  storeAddress: string;
+}
 
 export default function SocialRegisterPage() {
   const router = useRouter();
-  const params = useSearchParams();
-  const role = (params.get("role") as "USER" | "TENANT") || "USER";
-
   const { status } = useSession();
+  const { refreshUser } = useAuth();
+  const [lastErrorTime, setLastErrorTime] = useState(0);
+
+  const [role] = useState<"USER" | "TENANT" | null>(
+    () => localStorage.getItem("social-role") as "USER" | "TENANT" | null,
+  );
 
   useEffect(() => {
     if (status === "unauthenticated") {
-      toast.error("Session expired, please login again");
+      localStorage.removeItem("social-role");
       router.replace("/login");
     }
-  }, [status, router]);
+  }, [status, router, role]);
 
-  async function submitSocialRegister(values: SocialRegisterForm) {
+  useEffect(() => {
+    async function checkSocialLogin() {
+      if (status !== "authenticated" || !role) return;
+
+      try {
+        const tokenRes = await fetch("/api/get-auth-token");
+        const tokenData = await tokenRes.json();
+
+        if (!tokenData.token) {
+          router.replace("/login");
+          return;
+        }
+
+        const res = await axios.post(
+          `${process.env.NEXT_PUBLIC_API_DOMAIN}/api/auth/social/login`,
+          { role },
+          {
+            headers: {
+              Authorization: `Bearer ${tokenData.token}`,
+            },
+            withCredentials: true,
+          },
+        );
+
+        // ✅ Kalau tidak ada needsRegistration → login sukses
+        if (!res.data.needsRegistration) {
+          localStorage.removeItem("social-role");
+          await refreshUser();
+          router.replace("/");
+        }
+      } catch (err) {
+        if (axios.isAxiosError(err)) {
+          const status = err.response?.status;
+
+          if (status === 404) {
+            return;
+          }
+
+          router.replace("/login");
+        }
+      }
+    }
+
+    checkSocialLogin();
+  }, [status, role, refreshUser, router]);
+
+  async function handleSubmit(values: ISocialRegisterFormValues) {
+    if (!role) return;
+
     try {
-      // ambil JWT resmi dari NextAuth cookie
       const tokenRes = await fetch("/api/get-auth-token");
       const tokenData = await tokenRes.json();
 
       if (!tokenData.token) {
-        toast.error("Failed to retrieve token");
+        localStorage.removeItem("social-role");
+        router.replace("/login");
         return;
       }
 
-      const cleaned = Object.fromEntries(
-        Object.entries(values).filter(([, v]) => v !== ""),
-      );
+      const payload =
+        role === "USER"
+          ? { role, name: values.name }
+          : {
+              role,
+              storeName: values.storeName,
+              storeAddress: values.storeAddress || null,
+            };
 
       await axios.post(
         `${process.env.NEXT_PUBLIC_API_DOMAIN}/api/auth/social/register`,
-        cleaned,
+        payload,
         {
           headers: { Authorization: `Bearer ${tokenData.token}` },
           withCredentials: true,
         },
       );
 
-      toast.success("Account created");
+      localStorage.removeItem("social-role");
+
+      await refreshUser();
       router.replace("/");
     } catch (err) {
       if (axios.isAxiosError(err)) {
         const status = err.response?.status;
 
         if (status === 400) {
-          toast.error("Invalid data. Please check your input.");
+          const now = Date.now();
+          if (now - lastErrorTime < 2000) return;
+          setLastErrorTime(now);
+          toast.error("Invalid input.");
           return;
         }
 
         if (status === 401) {
-          toast.error("Session expired. Please login again.");
+          const now = Date.now();
+          if (now - lastErrorTime < 2000) return;
+          setLastErrorTime(now);
+          localStorage.removeItem("social-role");
           router.replace("/login");
           return;
         }
 
-        if (status === 409) {
-          toast.error("Account already exists.");
+        if (status === 403) {
+          const now = Date.now();
+          if (now - lastErrorTime < 2000) return;
+          setLastErrorTime(now);
+          toast.error("Unauthorized role access.");
+          localStorage.removeItem("social-role");
+          router.replace("/login");
           return;
         }
 
         if (status === 429) {
-          toast.error("Too many attempts. Try again later.");
+          const now = Date.now();
+          if (now - lastErrorTime < 2000) return;
+          setLastErrorTime(now);
+          toast.error("Too many attempts.");
           return;
         }
 
         if (status && status >= 500) {
-          toast.error("Server error. Please try again later.");
-          return;
-        }
-
-        if (err.response?.data?.message) {
-          toast.error(err.response.data.message);
+          const now = Date.now();
+          if (now - lastErrorTime < 2000) return;
+          setLastErrorTime(now);
+          toast.error("Server error.");
           return;
         }
       }
 
+      const now = Date.now();
+      if (now - lastErrorTime < 2000) return;
+      setLastErrorTime(now);
       toast.error("Failed to complete registration.");
     }
   }
 
-  if (status === "loading") return <div>Loading...</div>;
-  if (status !== "authenticated") return;
+  if (status === "loading" || !role) return <LoadingScreen />;
 
   return (
     <div className="max-w-md mx-auto p-6 mt-10 border rounded-xl">
-      <h2 className="text-xl mb-4">Complete your account</h2>
+      <h2 className="text-xl font-semibold mb-4">Complete Your Account</h2>
 
-      <Formik
-        initialValues={{ role, name: "", storeName: "", storeAddress: "" }}
-        onSubmit={submitSocialRegister}
+      <Formik<ISocialRegisterFormValues>
+        initialValues={{
+          name: "",
+          storeName: "",
+          storeAddress: "",
+        }}
+        validate={(values) => {
+          if (!role) return {};
+
+          try {
+            socialRegisterSchema.parse({ ...values, role });
+            return {};
+          } catch (err) {
+            if (err instanceof ZodError) {
+              const errors: Record<string, string> = {};
+
+              err.issues.forEach((e) => {
+                if (e.path?.[0]) {
+                  errors[e.path[0] as string] = e.message;
+                }
+              });
+
+              return errors;
+            }
+
+            return {};
+          }
+        }}
+        onSubmit={handleSubmit}
       >
-        {({ values }) => (
+        {({ isSubmitting }) => (
           <Form className="flex flex-col gap-3">
-            {values.role === "USER" && (
-              <Field
-                name="name"
-                placeholder="Name"
-                className="border p-2 rounded text-black"
-              />
-            )}
-            {values.role === "TENANT" && (
+            {role === "USER" && (
               <>
                 <Field
-                  name="storeName"
-                  placeholder="Store Name"
-                  className="border p-2 rounded text-black"
+                  name="name"
+                  placeholder="Your Name"
+                  className="border p-2 rounded text-black bg-white"
                 />
-                <Field
-                  name="storeAddress"
-                  placeholder="Store Address"
-                  className="border p-2 rounded text-black"
+                <ErrorMessage
+                  name="name"
+                  component="div"
+                  className="text-red-500 text-sm"
                 />
               </>
             )}
 
-            <button type="submit" className="bg-black text-white p-2 rounded">
-              Continue
+            {role === "TENANT" && (
+              <>
+                <Field
+                  name="storeName"
+                  placeholder="Store Name"
+                  className="border p-2 rounded text-black bg-white"
+                />
+                <ErrorMessage
+                  name="storeName"
+                  component="div"
+                  className="text-red-500 text-sm"
+                />
+
+                <Field
+                  name="storeAddress"
+                  placeholder="Store Address"
+                  className="border p-2 rounded text-black bg-white"
+                />
+                <ErrorMessage
+                  name="storeAddress"
+                  component="div"
+                  className="text-red-500 text-sm"
+                />
+              </>
+            )}
+
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className={`p-2 rounded text-black transition ${
+                isSubmitting
+                  ? "bg-gray-400 cursor-not-allowed"
+                  : "bg-white hover:opacity-90 cursor-pointer"
+              }`}
+            >
+              {isSubmitting ? "Processing..." : "Continue"}
             </button>
           </Form>
         )}

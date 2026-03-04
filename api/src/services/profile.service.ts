@@ -1,8 +1,6 @@
 import bcrypt from "bcryptjs";
 import { createHash } from "crypto";
-import fs from "fs/promises";
 
-import cloudinary from "../configs/cloudinary.config.js";
 import { prisma } from "../libs/prisma.lib.js";
 import { AppError } from "../errors/app.error.js";
 import { generateToken } from "../utils/token.util.js";
@@ -32,6 +30,7 @@ export class ProfileService {
         id: account.id,
         email: account.email,
         role: "USER",
+        provider: account.provider,
         verificationStatus: account.verificationStatus,
         ...(account.user?.name && { name: account.user.name }),
         ...(account.user?.profileImage && {
@@ -44,6 +43,7 @@ export class ProfileService {
       id: account.id,
       email: account.email,
       role: "TENANT",
+      provider: account.provider,
       verificationStatus: account.verificationStatus,
       ...(account.tenant?.storeName && {
         storeName: account.tenant.storeName,

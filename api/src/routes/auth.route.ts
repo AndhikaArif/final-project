@@ -14,15 +14,26 @@ router.post(
 router.post("/verify-email", authController.verifyEmail);
 router.post("/login", RateLimitMiddleware.loginLimiter, authController.login);
 router.post("/social/register", verifyAuthJs, authController.registerSocial);
-router.post("/social/login", verifyAuthJs, authController.loginSocial);
+router.post(
+  "/social/login",
+  RateLimitMiddleware.socialLoginLimiter,
+  verifyAuthJs,
+  authController.loginSocial,
+);
 router.post("/logout", authController.logout);
 
 router.post(
   "/forgot-password",
-  RateLimitMiddleware.resetPasswordLimiter,
+  RateLimitMiddleware.forgotPasswordLimiter,
   authController.forgotPassword,
 );
-router.post("/reset-password", authController.resetPassword);
+
+router.post(
+  "/reset-password",
+  RateLimitMiddleware.resetPasswordLimiter,
+  authController.resetPassword,
+);
+
 router.post(
   "/resend-verification",
   RateLimitMiddleware.resendVerificationLimiter,

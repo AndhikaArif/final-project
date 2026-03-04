@@ -7,6 +7,7 @@ interface IUserProfile {
   role: "USER" | "TENANT";
   email: string;
   verificationStatus: "PENDING" | "VERIFIED";
+  provider: "EMAIL" | "GOOGLE" | "FACEBOOK";
 
   name?: string;
   profileImage?: string;
@@ -41,8 +42,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       );
 
       setUser(res.data);
-    } catch {
-      setUser(null);
+    } catch (err) {
+      if (axios.isAxiosError(err) && err.response?.status === 401) {
+        setUser(null);
+      } else {
+        console.error("Failed to fetch user");
+      }
     }
   }
 

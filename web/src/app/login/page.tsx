@@ -4,9 +4,8 @@ import { Formik, Form, Field, ErrorMessage } from "formik";
 import axios from "axios";
 import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
-import { useSession } from "next-auth/react";
 
 import { toFormikValidationSchema } from "zod-formik-adapter";
 import { loginSchemaFront } from "@/validation/login.validation";
@@ -35,107 +34,9 @@ export default function LoginPage() {
 
     // redirect ke OAuth
     await signIn(socialProvider, {
-      callbackUrl: "/login?social=done",
+      callbackUrl: "/login/social-login",
     });
   }
-
-  const { status } = useSession();
-  const socialHandled = useRef(false);
-
-  useEffect(() => {
-    if (status !== "authenticated") return;
-    const url = new URL(window.location.href);
-    const isSocialDone = url.searchParams.get("social");
-
-    if (isSocialDone !== "done") return;
-
-    if (socialHandled.current) return;
-    socialHandled.current = true;
-
-    const role = localStorage.getItem("social-role") as
-      | "USER"
-      | "TENANT"
-      | null;
-
-    if (!role) return;
-
-    const handleSocialLogin = async () => {
-      try {
-        const res = await fetch("/api/get-auth-token");
-
-        if (!res.ok) {
-          localStorage.removeItem("social-role");
-          return;
-        }
-
-        const data = await res.json();
-
-        if (!data.token) {
-          localStorage.removeItem("social-role");
-          toast.error("Failed to retrieve session token.");
-          return;
-        }
-
-        await axios.post(
-          `${process.env.NEXT_PUBLIC_API_DOMAIN}/api/auth/social/login`,
-          { role },
-          {
-            headers: { Authorization: `Bearer ${data.token}` },
-            withCredentials: true,
-          },
-        );
-
-        localStorage.removeItem("social-role");
-        window.history.replaceState({}, document.title, "/login");
-
-        await refreshUser();
-        router.replace("/");
-      } catch (err) {
-        if (axios.isAxiosError(err)) {
-          const status = err.response?.status;
-
-          if (status === 404) {
-            router.push(`/social-register?role=${role}`);
-            return;
-          }
-
-          if (status === 401) {
-            localStorage.removeItem("social-role");
-            toast.error("Session expired. Please login again.");
-            router.replace("/login");
-            return;
-          }
-
-          if (status === 403) {
-            toast.error(
-              "This email is already registered using a different login method. Please sign in using the original provider.",
-            );
-            localStorage.removeItem("social-role");
-            return;
-          }
-
-          if (status === 429) {
-            toast.error("Too many attempts. Please try again later.");
-            return;
-          }
-
-          if (status && status >= 500) {
-            toast.error("Server is currently unavailable.");
-            return;
-          }
-
-          if (err.response?.data?.message) {
-            toast.error(err.response.data.message);
-            return;
-          }
-        }
-
-        toast.error("Unable to login with social account.");
-      }
-    };
-
-    handleSocialLogin();
-  }, [status, refreshUser, router]);
 
   useEffect(() => {
     if (localStorage.getItem("session-expired")) {
