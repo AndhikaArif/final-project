@@ -1,71 +1,61 @@
 import { prisma } from "../libs/prisma.lib.js";
 import { AppError } from "../errors/app.error.js";
 import { TenantResolverService } from "./tenant-resolver.service.js";
-import { AdjustmentType } from "../generated/prisma/client.js";
-import type {
-  CreatePeakSeasonDTO,
-  UpdatePeakSeasonDTO,
-} from "../validations/property.validation.js";
+import { normalizeDate } from "../utils/date.util.js";
+import { validateRoomOwnership } from "../utils/room-ownership.util.js";
 
 export class PeakSeasonService {
   async createPeakSeason(
     roomTypeId: string,
     authAccountId: string,
-    data: CreatePeakSeasonDTO,
+    startDate: Date,
+    endDate: Date,
+    adjustmentType: "PERCENTAGE" | "NOMINAL",
+    value: number,
   ) {
-    const tenantId = await TenantResolverService.getTenantId(authAccountId);
+    await validateRoomOwnership(roomTypeId, authAccountId);
 
-    const room = await prisma.roomType.findFirst({
-      where: {
-        id: roomTypeId,
-        property: {
-          tenantId,
-        },
-      },
-    });
+    const start = normalizeDate(startDate);
+    const end = normalizeDate(endDate);
 
-    if (!room) {
-      throw new AppError(403, "You are not allowed to add peak season here");
+    if (start > end) {
+      throw new AppError(400, "startDate must be before endDate");
     }
 
-    if (data.adjustmentType === "PERCENTAGE" && data.value > 100) {
-      throw new AppError(400, "Percentage cannot exceed 100%");
+    const diffDays =
+      Math.floor((end.getTime() - start.getTime()) / 86400000) + 1;
+
+    if (diffDays > 365) {
+      throw new AppError(400, "Peak season max range is 365 days");
     }
 
-    if (data.value < 0) {
-      throw new AppError(400, "Value cannot be negative");
+    if (value < 0) {
+      throw new AppError(400, "Value must be positive");
     }
 
-    const startDate = new Date(data.startDate);
-    const endDate = new Date(data.endDate);
-
-    if (startDate >= endDate) {
-      throw new AppError(400, "End date must be after start date");
+    if (adjustmentType === "PERCENTAGE" && value > 1000) {
+      throw new AppError(400, "Percentage too large");
     }
 
-    // 🔥 OVERLAP CHECK
-    const overlapping = await prisma.peakSeasonRate.findFirst({
+    const overlap = await prisma.peakSeasonRate.findFirst({
       where: {
         roomTypeId,
-        startDate: { lte: endDate },
-        endDate: { gte: startDate },
+        startDate: { lte: end },
+        endDate: { gte: start },
       },
     });
 
-    if (overlapping) {
-      throw new AppError(
-        400,
-        "Peak season date range overlaps with existing one",
-      );
+    if (overlap) {
+      throw new AppError(400, "Peak season date overlaps with existing one");
     }
 
     return prisma.peakSeasonRate.create({
       data: {
         roomTypeId,
-        startDate,
-        endDate,
-        adjustmentType: data.adjustmentType as AdjustmentType,
-        value: data.value,
+        startDate: start,
+        endDate: end,
+        adjustmentType,
+        value,
       },
     });
   }
@@ -73,72 +63,68 @@ export class PeakSeasonService {
   async updatePeakSeason(
     id: string,
     authAccountId: string,
-    data: UpdatePeakSeasonDTO,
+    startDate: Date,
+    endDate: Date,
+    adjustmentType: "PERCENTAGE" | "NOMINAL",
+    value: number,
   ) {
     const tenantId = await TenantResolverService.getTenantId(authAccountId);
 
-    const peak = await prisma.peakSeasonRate.findFirst({
+    const existing = await prisma.peakSeasonRate.findFirst({
       where: {
         id,
         roomType: {
-          property: {
-            tenantId,
-          },
+          property: { tenantId },
         },
       },
     });
 
-    if (!peak) {
-      throw new AppError(403, "You are not allowed to update this peak season");
+    if (!existing) {
+      throw new AppError(403, "Not allowed");
     }
 
-    const startDate = data.startDate
-      ? new Date(data.startDate)
-      : peak.startDate;
-    const endDate = data.endDate ? new Date(data.endDate) : peak.endDate;
-
-    if (startDate >= endDate) {
-      throw new AppError(400, "End date must be after start date");
+    if (value < 0) {
+      throw new AppError(400, "Value must be positive");
     }
 
-    if (
-      data.adjustmentType === "PERCENTAGE" &&
-      data.value !== undefined &&
-      data.value > 100
-    ) {
-      throw new AppError(400, "Percentage cannot exceed 100%");
+    if (adjustmentType === "PERCENTAGE" && value > 1000) {
+      throw new AppError(400, "Percentage too large");
     }
 
-    if (data.value !== undefined && data.value < 0) {
-      throw new AppError(400, "Value cannot be negative");
+    const start = normalizeDate(startDate);
+    const end = normalizeDate(endDate);
+
+    if (start > end) {
+      throw new AppError(400, "startDate must be before endDate");
     }
 
-    // 🔥 OVERLAP CHECK (exclude dirinya sendiri)
-    const overlapping = await prisma.peakSeasonRate.findFirst({
+    const diffDays =
+      Math.floor((end.getTime() - start.getTime()) / 86400000) + 1;
+
+    if (diffDays > 365) {
+      throw new AppError(400, "Peak season max range is 365 days");
+    }
+
+    const overlap = await prisma.peakSeasonRate.findFirst({
       where: {
-        roomTypeId: peak.roomTypeId,
+        roomTypeId: existing.roomTypeId,
         id: { not: id },
-        startDate: { lte: endDate },
-        endDate: { gte: startDate },
+        startDate: { lte: end },
+        endDate: { gte: start },
       },
     });
 
-    if (overlapping) {
-      throw new AppError(
-        400,
-        "Peak season date range overlaps with existing one",
-      );
+    if (overlap) {
+      throw new AppError(400, "Peak season date overlaps with existing one");
     }
 
     return prisma.peakSeasonRate.update({
       where: { id },
       data: {
-        startDate,
-        endDate,
-        ...(data.adjustmentType !== undefined && {
-          adjustmentType: data.adjustmentType as AdjustmentType,
-        }),
-        ...(data.value !== undefined && { value: data.value }),
+        startDate: start,
+        endDate: end,
+        adjustmentType,
+        value,
       },
     });
   }
@@ -146,23 +132,30 @@ export class PeakSeasonService {
   async deletePeakSeason(id: string, authAccountId: string) {
     const tenantId = await TenantResolverService.getTenantId(authAccountId);
 
-    const peak = await prisma.peakSeasonRate.findFirst({
+    const existing = await prisma.peakSeasonRate.findFirst({
       where: {
         id,
         roomType: {
-          property: {
-            tenantId,
-          },
+          property: { tenantId },
         },
       },
     });
 
-    if (!peak) {
-      throw new AppError(403, "You are not allowed to delete this peak season");
+    if (!existing) {
+      throw new AppError(403, "Not allowed");
     }
 
     return prisma.peakSeasonRate.delete({
       where: { id },
+    });
+  }
+
+  async getByRoomPeakSeason(roomTypeId: string, authAccountId: string) {
+    await validateRoomOwnership(roomTypeId, authAccountId);
+
+    return prisma.peakSeasonRate.findMany({
+      where: { roomTypeId },
+      orderBy: { startDate: "asc" },
     });
   }
 }

@@ -151,11 +151,14 @@ export class ProfileService {
       );
     }
 
+    if (account.email === newEmail) {
+      throw new AppError(400, "New email must be different");
+    }
+
     await prisma.authAccount.update({
       where: { id: authAccountId },
       data: {
-        email: newEmail,
-        verificationStatus: "PENDING",
+        pendingEmail: newEmail,
       },
     });
 

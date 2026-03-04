@@ -72,7 +72,7 @@ export default function CategoryForm({ editing, onSuccess }: Props) {
       <button
         type="submit"
         disabled={submitting}
-        className="bg-blue-600 text-white px-4 py-2 rounded disabled:opacity-50"
+        className="bg-blue-600 text-white hover:bg-blue-500 px-4 py-2 rounded disabled:opacity-50 cursor-pointer"
       >
         {submitting ? "Processing..." : editing ? "Update" : "Create"}
       </button>

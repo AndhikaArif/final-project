@@ -24,12 +24,40 @@ export class EmailService {
       throw new AppError(400, "Invalid verification token");
     }
 
-    if (record.authAccount.verificationStatus === "VERIFIED") {
-      throw new AppError(400, "Account already verified");
-    }
-
     if (record.expiredAt < new Date()) {
       throw new AppError(401, "Verification token expired");
+    }
+
+    const account = record.authAccount;
+
+    // 🔥 CASE 1: UPDATE EMAIL
+    if (account.pendingEmail) {
+      const exists = await prisma.authAccount.findUnique({
+        where: { email: account.pendingEmail },
+      });
+
+      if (exists) {
+        throw new AppError(400, "Email already taken");
+      }
+
+      await prisma.authAccount.update({
+        where: { id: account.id },
+        data: {
+          email: account.pendingEmail,
+          pendingEmail: null,
+        },
+      });
+
+      await prisma.verificationToken.delete({
+        where: { id: record.id },
+      });
+
+      return { message: "Email updated successfully" };
+    }
+
+    // 🔥 CASE 2: REGISTER FLOW
+    if (account.verificationStatus === "VERIFIED") {
+      throw new AppError(400, "Account already verified");
     }
 
     const hashedPassword = await bcrypt.hash(payload.password, 10);
@@ -60,7 +88,7 @@ export class EmailService {
       throw new AppError(400, "No Account");
     }
 
-    if (account.verificationStatus === "VERIFIED") {
+    if (account.verificationStatus === "VERIFIED" && !account.pendingEmail) {
       throw new AppError(400, "Account already verified");
     }
 

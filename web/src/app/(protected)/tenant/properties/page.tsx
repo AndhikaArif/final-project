@@ -97,6 +97,7 @@ export default function PropertyPage() {
       <h1 className="text-2xl font-bold">Property Management</h1>
 
       <PropertyForm
+        key={editing?.id ?? "create"}
         editing={editing}
         onSuccess={() => {
           setEditing(null);

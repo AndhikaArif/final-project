@@ -16,7 +16,7 @@ export class ErrorMiddleware {
   ) {
     console.error(error);
 
-    // ✅ HANDLE ZOD ERROR
+    // HANDLE ZOD ERROR
     if (error instanceof ZodError) {
       return res.status(400).json({
         message: error.issues[0]?.message,
