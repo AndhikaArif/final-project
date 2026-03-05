@@ -1,15 +1,21 @@
 import { type Request, type Response, type NextFunction } from "express";
-import { PaymentService } from "../services/payment.service.js";
 import { AppError } from "../errors/app.error.js";
+import { CreatePaymentService } from "../services/payment/create-payment.service.js";
+import { GetAllPayments } from "../services/payment/get-all-payments.service.js";
+import { GetPaymentById } from "../services/payment/get-payment-by-id.service.js";
+import { UpdatePayment } from "../services/payment/update-payment.service.js";
 
-const paymentService = new PaymentService();
+const createPayment = new CreatePaymentService();
+const getAllPayments = new GetAllPayments();
+const getPaymentById = new GetPaymentById();
+const updatePayment = new UpdatePayment();
 
 export class PaymentController {
   async createPayment(req: Request, res: Response, next: NextFunction) {
     try {
       const orderId = req.body;
 
-      const payment = await paymentService.createPayment(orderId);
+      const payment = await createPayment.createPayment(orderId);
 
       res.status(201).json({ message: "Success create payment", payment });
     } catch (error) {
@@ -23,7 +29,7 @@ export class PaymentController {
       const page = Number(req.query.page) || 1;
       const limit = Number(req.query.limit) || 10;
 
-      const payments = await paymentService.getAllPayment(
+      const payments = await getAllPayments.getAllPayment(
         tenantId,
         page,
         limit,
@@ -45,7 +51,7 @@ export class PaymentController {
       const page = Number(req.query.page) || 1;
       const limit = Number(req.query.limit) || 10;
 
-      const payments = await paymentService.getAllPaymentForApproval(
+      const payments = await getAllPayments.getAllPaymentForApproval(
         tenantId,
         page,
         limit,
@@ -62,7 +68,7 @@ export class PaymentController {
       const id = String(req.params.id);
       const currentUser = req.currentUser;
 
-      const payment = await paymentService.getPaymentById(id, currentUser);
+      const payment = await getPaymentById.getPaymentById(id, currentUser);
 
       res.status(200).json(payment);
     } catch (error) {
@@ -81,7 +87,7 @@ export class PaymentController {
         throw new AppError(400, "Payment proof file is required");
       }
 
-      const updatedPayment = await paymentService.updatePaymentProof({
+      const updatedPayment = await updatePayment.updatePaymentProof({
         id,
         userId,
         paymentProof,
@@ -90,6 +96,28 @@ export class PaymentController {
       res
         .status(200)
         .json({ message: "Success upload payment proof", updatedPayment });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async updatePaymentStatus(req: Request, res: Response, next: NextFunction) {
+    try {
+      const id = String(req.params.id);
+      const { status } = req.body;
+
+      const tenantId = req.currentUser.id;
+
+      const result = await updatePayment.updatePaymentStatus({
+        id,
+        status,
+        tenantId,
+      });
+
+      res.status(200).json({
+        message: "Payment status updated successfully",
+        result,
+      });
     } catch (error) {
       next(error);
     }

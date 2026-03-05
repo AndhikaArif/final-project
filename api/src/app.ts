@@ -14,6 +14,7 @@ import propertyRoutes from "./routes/property.route.js";
 import orderRoutes from "./routes/order.route.js";
 import paymentRoutes from "./routes/payment.route.js";
 import { ErrorMiddleware } from "./middlewares/error.middleware.js";
+import { paymentReminderScheduler } from "./scheduler/payment-reminder.js";
 
 class App {
   public app: Application;
@@ -26,6 +27,7 @@ class App {
     this.initializeMiddlewares();
     this.initializeStatus();
     this.initializeRoutes();
+    this.initializeSchedulers;
     this.initializeErrorHandler();
   }
 
@@ -61,6 +63,10 @@ class App {
   private initializeErrorHandler(): void {
     this.app.use(ErrorMiddleware.notFound);
     this.app.use(ErrorMiddleware.global);
+  }
+
+  private initializeSchedulers(): void {
+    paymentReminderScheduler();
   }
 
   public listen(): void {

@@ -44,6 +44,12 @@ router.get(
   propertyController.getPropertyDetail,
 );
 
+router.get(
+  "/property/rooms/:id",
+  validate(PropertySchema.idParam, "params"),
+  roomController.getRoomById,
+);
+
 /* ================= TENANT ================= */
 
 router.use(
