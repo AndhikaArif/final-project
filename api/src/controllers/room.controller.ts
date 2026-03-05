@@ -85,4 +85,19 @@ export class RoomController {
       next(err);
     }
   }
+
+  async getRoomById(req: Request, res: Response, next: NextFunction) {
+    try {
+      const params = res.locals.params as IdParam;
+
+      const result = await roomService.getRoomById(params.id);
+
+      res.status(200).json({
+        message: "Room fetched successfully",
+        data: result,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
 }

@@ -16,9 +16,12 @@ interface RoomType {
   id: string;
   name: string;
   basePrice: number;
+  description: string;
+  totalRoom: number;
 }
 
 interface OrderItem {
+  roomTypeId: string;
   roomTypeName: string;
   basePrice: number;
   roomQuantity: number;
@@ -31,12 +34,10 @@ export default function CreateOrderPage() {
 
   // QUERY PARAMS
   const propertyId = searchParams.get("propertyId") ?? "";
-  const roomTypeId = searchParams.get("roomTypeId") ?? "";
   const checkIn = searchParams.get("checkIn") ?? "";
   const checkOut = searchParams.get("checkOut") ?? "";
-
-  const guest = Number(searchParams.get("guest") ?? 0);
-  const roomQuantity = Number(searchParams.get("roomRuantity") ?? 1);
+  const guest = Number(searchParams.get("guest") ?? 1);
+  const roomsParam = searchParams.get("rooms") ?? "";
 
   // STATE
   const [property, setProperty] = useState<PropertyItem | null>(null);
@@ -44,8 +45,7 @@ export default function CreateOrderPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // VALIDATE PARAMS
-  const invalidParams = !propertyId || !roomTypeId || !checkIn || !checkOut;
+  const invalidParams = !propertyId || !checkIn || !checkOut || !roomsParam;
 
   // CALCULATE NIGHTS
   const nights = useMemo(() => {
@@ -53,13 +53,25 @@ export default function CreateOrderPage() {
 
     const checkInDate = new Date(checkIn);
     const checkOutDate = new Date(checkOut);
-
     const diff = checkOutDate.getTime() - checkInDate.getTime();
 
     return Math.max(Math.ceil(diff / (1000 * 60 * 60 * 24)), 0);
   }, [checkIn, checkOut]);
 
-  // FETCH PROPERTY + ROOM TYPE
+  // PARSE ROOMS PARAM
+  const parsedRooms = useMemo(() => {
+    if (!roomsParam) return [];
+
+    return roomsParam.split(",").map((r) => {
+      const [roomTypeId, qty] = r.split(":");
+      return {
+        roomTypeId,
+        roomQuantity: Number(qty),
+      };
+    });
+  }, [roomsParam]);
+
+  // FETCH DATA
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -75,28 +87,38 @@ export default function CreateOrderPage() {
           return;
         }
 
-        const [propertyRes, roomTypeRes] = await Promise.all([
-          axios.get<PropertyItem>(
-            `http://localhost:8000/api/properties/${propertyId}`,
+        if (guest < 1) {
+          setError("Guest must be at least 1");
+          setLoading(false);
+          return;
+        }
+
+        // FETCH PROPERTY
+        const propertyRes = await axios.get<{ data: PropertyItem }>(
+          `http://localhost:8000/api/properties/${propertyId}`,
+        );
+        setProperty(propertyRes.data.data);
+
+        // FETCH ROOM TYPES
+        const roomRequests = parsedRooms.map((room) =>
+          axios.get<{ data: RoomType }>(
+            `http://localhost:8000/api/property/rooms/${room.roomTypeId}`,
           ),
-          axios.get<RoomType>(
-            `http://localhost:8000/api/room-types/${roomTypeId}`,
-          ),
-        ]);
+        );
 
-        const propertyData = propertyRes.data;
-        const roomTypeData = roomTypeRes.data;
+        const roomResponses = await Promise.all(roomRequests);
 
-        setProperty(propertyData);
-
-        const orderItems: OrderItem[] = [
-          {
-            roomTypeName: roomTypeData.name,
-            basePrice: roomTypeData.basePrice,
-            roomQuantity,
+        // BUILD ORDER ITEMS
+        const orderItems: OrderItem[] = roomResponses.map((res, index) => {
+          const roomData = res.data.data;
+          return {
+            roomTypeId: roomData.id,
+            roomTypeName: roomData.name,
+            basePrice: roomData.basePrice ?? 0,
+            roomQuantity: parsedRooms[index].roomQuantity,
             nights,
-          },
-        ];
+          };
+        });
 
         setItems(orderItems);
       } catch (err) {
@@ -108,7 +130,7 @@ export default function CreateOrderPage() {
     };
 
     fetchData();
-  }, [propertyId, roomTypeId, roomQuantity, nights, invalidParams]);
+  }, [propertyId, parsedRooms, nights, invalidParams, guest]);
 
   // FORM
   const formik = useFormik({
@@ -126,14 +148,14 @@ export default function CreateOrderPage() {
           checkIn,
           checkOut,
           guest,
-          items: [
-            {
-              roomTypeId,
-              roomQuantity,
-            },
-          ],
+          items: items.map((item) => ({
+            roomTypeId: item.roomTypeId,
+            roomQuantity: item.roomQuantity,
+          })),
           guestInfo: values,
         };
+
+        console.log("Order payload:", payload); // 🔥 Debug payload
 
         const orderRes = await axios.post(
           "http://localhost:8000/api/order/create",
@@ -149,16 +171,14 @@ export default function CreateOrderPage() {
           { withCredentials: true },
         );
 
-        if (!paymentRes.data) {
-          throw new Error("Payment creation failed");
-        }
+        if (!paymentRes.data) throw new Error("Payment creation failed");
 
-        // REDIRECT
         router.push(`/payment/${orderId}`);
       } catch (err: any) {
         console.error(err);
 
-        if (err.response?.status === 401) {
+        if (err.response?.status === 401 || err.response?.status === 403) {
+          alert(err.response.data?.message ?? "Not authorized");
           router.push("/login");
         } else {
           alert("Failed to create order. Please try again.");
@@ -168,17 +188,10 @@ export default function CreateOrderPage() {
   });
 
   // GUARD UI
-  if (loading) {
-    return <div className="text-black">Loading...</div>;
-  }
-
-  if (error) {
-    return <div className="text-red-500">{error}</div>;
-  }
-
-  if (!property || !items.length) {
-    return <div className="text-red-500">Booking data not found</div>;
-  }
+  if (loading) return <div className="text-black p-10">Loading...</div>;
+  if (error) return <div className="text-red-500 p-10">{error}</div>;
+  if (!property || !items.length)
+    return <div className="text-red-500 p-10">Booking data not found</div>;
 
   return (
     <div className="min-h-fit bg-white flex flex-col justify-center items-center gap-y-4 pt-10 pb-25 xl:flex-row xl:items-start xl:gap-x-6">

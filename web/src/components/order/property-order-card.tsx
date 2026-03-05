@@ -6,11 +6,16 @@ export default function PropertyOrderCard({
 }: {
   property: PropertyItem;
 }) {
+  const imageSrc =
+    property.image && property.image !== ""
+      ? property.image
+      : "https://images.unsplash.com/photo-1560185127-6ed189bf02f4";
+
   return (
     <div className="flex flex-col bg-white border border-gray-200 w-[450px] pb-4">
       <div className="relative w-[450px] h-45 mb-4">
         <Image
-          src={property.image}
+          src={imageSrc}
           alt={property.name}
           fill
           className="object-cover rounded-t-2xl"

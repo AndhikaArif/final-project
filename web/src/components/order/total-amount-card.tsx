@@ -32,7 +32,7 @@ export default function TotalAmountCard({ items }: TotalAmountCardProps) {
                 </h3>
 
                 <p className="text-gray-400">
-                  Rp {item.basePrice.toLocaleString("id-ID")} / night
+                  Rp {(item.basePrice ?? 0).toLocaleString("id-ID")} / night
                 </p>
 
                 <p className="text-gray-400">{item.nights} nights</p>
