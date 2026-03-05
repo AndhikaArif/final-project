@@ -24,7 +24,6 @@ export class CancelOrderService {
       },
       include: {
         payments: true,
-        orderItems: true,
       },
     });
 
@@ -37,7 +36,7 @@ export class CancelOrderService {
     }
 
     if (order.status === "PAID") {
-      throw new AppError(400, "Completed order cannot be cancelled");
+      throw new AppError(400, "Paid order cannot be cancelled");
     }
 
     if (order.status !== "WAITING_PAYMENT") {
@@ -45,36 +44,26 @@ export class CancelOrderService {
     }
 
     await prisma.$transaction(async (tx) => {
-      // UPDATE ORDER
+      // UPDATE ORDER STATUS
       await tx.order.update({
         where: { id },
-        data: { status: "CANCELLED" },
+        data: {
+          status: "CANCELLED",
+        },
       });
 
-      // UPDATE PAYMENT
-      if (order.payments.length > 0) {
-        await tx.payment.updateMany({
-          where: {
-            orderId: id,
-            status: {
-              not: "CANCELLED",
-            },
+      // CANCEL PAYMENTS
+      await tx.payment.updateMany({
+        where: {
+          orderId: id,
+          status: {
+            not: "CANCELLED",
           },
-          data: { status: "CANCELLED" },
-        });
-      }
-
-      // RELEASE TOTAL ROOM
-      for (const item of order.orderItems) {
-        await tx.roomType.update({
-          where: { id: item.roomTypeId },
-          data: {
-            totalRoom: {
-              increment: item.roomQuantity,
-            },
-          },
-        });
-      }
+        },
+        data: {
+          status: "CANCELLED",
+        },
+      });
     });
 
     return { message: "Order has been cancelled" };

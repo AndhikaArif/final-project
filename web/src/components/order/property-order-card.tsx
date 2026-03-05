@@ -7,7 +7,7 @@ export default function PropertyOrderCard({
   property: PropertyItem;
 }) {
   return (
-    <div className="flex flex-col bg-white border border-gray-200 w-[450px] h-75">
+    <div className="flex flex-col bg-white border border-gray-200 w-[450px] pb-4">
       <div className="relative w-[450px] h-45 mb-4">
         <Image
           src={property.image}
@@ -18,8 +18,9 @@ export default function PropertyOrderCard({
       </div>
       <div className="flex flex-col text-black gap-y-2 px-2">
         <h3 className="text-xl font-semibold">{property.name}</h3>
+        {/* Tambahkan rating */}
         <h4 className="text-sm">{property.address}</h4>
-        <h4 className="text-sm">{property.description}</h4>
+        <h4 className="text-sm text-gray-500">{property.description}</h4>
       </div>
     </div>
   );

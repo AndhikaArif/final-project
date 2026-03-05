@@ -1,10 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
-<<<<<<< HEAD
-import Navbar from "@/components/navbar";
-=======
 import { Toaster } from "react-hot-toast";
->>>>>>> main
 
 import Navbar from "@/components/navbar";
 import { AuthProvider } from "@/context/auth-context";
@@ -22,12 +18,6 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-<<<<<<< HEAD
-        <header className="sticky z-50 top-0">
-          <Navbar />
-        </header>
-        {children}
-=======
         <AuthProvider>
           <header className="sticky z-50 top-0">
             <Navbar />
@@ -46,7 +36,6 @@ export default function RootLayout({
             }}
           />
         </AuthProvider>
->>>>>>> main
       </body>
     </html>
   );

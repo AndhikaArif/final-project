@@ -26,7 +26,7 @@ router
 
 router
   .route("/approval")
-  .get(
+  .patch(
     AuthenticationMiddleware.verifyToken,
     AuthorizationMiddleware.allowRoles("TENANT"),
     paymentController.getAllPaymentForApproval,
@@ -34,12 +34,23 @@ router
 
 router
   .route("/:id")
-  .get(AuthenticationMiddleware.verifyToken, paymentController.getPaymentById)
-  .put(
+  .get(AuthenticationMiddleware.verifyToken, paymentController.getPaymentById);
+
+router
+  .route("/:id/proof")
+  .patch(
     AuthenticationMiddleware.verifyToken,
     AuthorizationMiddleware.allowRoles("USER"),
     upload.single("paymentProof"),
     paymentController.updatePaymentProof,
+  );
+
+router
+  .route("/:id/status")
+  .patch(
+    AuthenticationMiddleware.verifyToken,
+    AuthorizationMiddleware.allowRoles("TENANT"),
+    paymentController.updatePaymentStatus,
   );
 
 export default router;

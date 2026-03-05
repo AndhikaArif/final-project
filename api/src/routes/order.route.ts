@@ -24,15 +24,19 @@ router
   );
 
 router
-  .route("/orders")
+  .route("/tenant")
   .get(
     AuthenticationMiddleware.verifyToken,
     AuthorizationMiddleware.allowRoles("TENANT"),
-    orderController.getAllUserOrders,
+    orderController.getAllTenantOrders,
   );
 
 router
   .route("/:id")
   .get(AuthenticationMiddleware.verifyToken, orderController.getOrderById);
+
+router
+  .route("/:id/cancel")
+  .patch(AuthenticationMiddleware.verifyToken, orderController.cancelOrder);
 
 export default router;
