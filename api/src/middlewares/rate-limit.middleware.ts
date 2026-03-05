@@ -21,9 +21,29 @@ export class RateLimitMiddleware {
     },
   });
 
+  static socialLoginLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 menit
+    max: 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: {
+      message: "Too many social login attempts. Please try again later.",
+    },
+  });
+
+  static forgotPasswordLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 menit
+    max: 3,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: {
+      message: "Too many reset link requests. Please try again later.",
+    },
+  });
+
   static resetPasswordLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 menit
-    max: 1, // max 1 request
+    max: 5,
     standardHeaders: true,
     legacyHeaders: false,
     message: {

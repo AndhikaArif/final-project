@@ -1,5 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
 import { RoomService } from "../services/room.service.js";
+import type { PropertyIdParam } from "../validations/property.validation.js";
 import type {
   CreateRoomDTO,
   UpdateRoomDTO,
@@ -12,7 +13,7 @@ export class RoomController {
   async createRoom(req: Request, res: Response, next: NextFunction) {
     try {
       const authAccountId = req.currentUser!.authAccountId;
-      const params = res.locals.params as { propertyId: string };
+      const params = res.locals.params as PropertyIdParam;
       const body = res.locals.body as CreateRoomDTO;
 
       const result = await roomService.createRoom(
@@ -69,7 +70,7 @@ export class RoomController {
   async getRoomsByProperty(req: Request, res: Response, next: NextFunction) {
     try {
       const authAccountId = req.currentUser!.authAccountId;
-      const params = res.locals.params as { propertyId: string };
+      const params = res.locals.params as PropertyIdParam;
 
       const result = await roomService.getRoomsByProperty(
         params.propertyId,

@@ -17,7 +17,7 @@ export default function PropertyForm({
   const [name, setName] = useState("");
   const [city, setCity] = useState("");
   const [address, setAddress] = useState("");
-  const [maxGuest, setMaxGuest] = useState(1);
+  const [maxGuest, setMaxGuest] = useState("1");
   const [description, setDescription] = useState("");
   const [categoryId, setCategoryId] = useState("");
   const [image, setImage] = useState<File | null>(null);
@@ -43,7 +43,7 @@ export default function PropertyForm({
       setDescription(editing.description || "");
       setCity(editing.city);
       setAddress(editing.address);
-      setMaxGuest(editing.maxGuest);
+      setMaxGuest(editing.maxGuest.toString());
       setCategoryId(editing.category.id);
       setImage(null);
     } else {
@@ -51,7 +51,7 @@ export default function PropertyForm({
       setDescription("");
       setCity("");
       setAddress("");
-      setMaxGuest(1);
+      setMaxGuest("1");
       setCategoryId("");
       setImage(null);
     }
@@ -68,7 +68,11 @@ export default function PropertyForm({
     formData.append("description", description);
     formData.append("city", city);
     formData.append("address", address);
-    formData.append("maxGuest", maxGuest.toString());
+    if (!maxGuest || Number(maxGuest) < 1) {
+      return toast.error("Max guest must be at least 1");
+    }
+
+    formData.append("maxGuest", Number(maxGuest).toString());
 
     formData.append("categoryId", categoryId);
     if (image) formData.append("image", image);
@@ -188,7 +192,7 @@ export default function PropertyForm({
           placeholder="Max Guests"
           className="input w-full bg-gray-100 text-black p-2 rounded border"
           value={maxGuest}
-          onChange={(e) => setMaxGuest(Number(e.target.value))}
+          onChange={(e) => setMaxGuest(e.target.value)}
           min={1}
           required
         />

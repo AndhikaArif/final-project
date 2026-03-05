@@ -3,6 +3,7 @@
 import { Property } from "@/app/(protected)/tenant/properties/page";
 import { AiOutlineEdit, AiOutlineDelete } from "react-icons/ai";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 
 interface PropertyTableProps {
   data: Property[];
@@ -17,6 +18,8 @@ export default function PropertyTable({
   onEdit,
   onDelete,
 }: PropertyTableProps) {
+  const router = useRouter();
+
   if (data.length === 0) {
     return <p className="text-gray-500 mt-4">No properties available.</p>;
   }
@@ -37,11 +40,13 @@ export default function PropertyTable({
               <th className="px-4 py-2 text-left">Actions</th>
             </tr>
           </thead>
+
           <tbody>
             {data.map((p) => (
               <tr
                 key={p.id}
-                className="border-t border-gray-300 hover:bg-gray-800 transition-colors"
+                onClick={() => router.push(`/tenant/properties/${p.id}/rooms`)}
+                className="border-t border-gray-300 hover:bg-gray-800 transition-colors cursor-pointer"
               >
                 <td className="px-4 py-2">
                   {p.image ? (
@@ -65,14 +70,20 @@ export default function PropertyTable({
                 <td className="px-4 py-2">{p.category.name}</td>
                 <td className="px-4 py-2 flex items-center gap-2">
                   <button
-                    onClick={() => onEdit(p)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onEdit(p);
+                    }}
                     className="p-1 pt-4 rounded hover:bg-gray-300 transition cursor-pointer"
                     title="Edit property"
                   >
                     <AiOutlineEdit size={24} className="text-blue-600" />
                   </button>
                   <button
-                    onClick={() => onDelete(p.id)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDelete(p.id);
+                    }}
                     className="p-1 pt-4 rounded hover:bg-gray-300 transition cursor-pointer disabled:opacity-50"
                     disabled={deletingId === p.id}
                     title="Delete property"
@@ -95,7 +106,8 @@ export default function PropertyTable({
         {data.map((p) => (
           <div
             key={p.id}
-            className="border rounded-lg p-4 bg-gray-50 flex flex-col gap-2"
+            onClick={() => router.push(`/tenant/properties/${p.id}/rooms`)}
+            className="border rounded-lg p-4 bg-gray-50 flex flex-col gap-2 cursor-pointer"
           >
             <div className="flex gap-4 items-center">
               {p.image ? (
@@ -125,13 +137,19 @@ export default function PropertyTable({
             </div>
             <div className="flex gap-2 mt-2">
               <button
-                onClick={() => onEdit(p)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEdit(p);
+                }}
                 className="p-2 bg-blue-600 text-white rounded"
               >
                 Edit
               </button>
               <button
-                onClick={() => onDelete(p.id)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete(p.id);
+                }}
                 className="p-2 bg-red-600 text-white rounded"
                 disabled={deletingId === p.id}
               >

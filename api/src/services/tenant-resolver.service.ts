@@ -1,5 +1,3 @@
-// services/tenant-resolver.service.ts
-
 import { prisma } from "../libs/prisma.lib.js";
 import { AppError } from "../errors/app.error.js";
 

@@ -15,7 +15,14 @@ export class PasswordService {
       where: { email },
     });
 
-    if (!account) return;
+    if (
+      !account ||
+      account.verificationStatus !== "VERIFIED" ||
+      account.provider !== "EMAIL"
+    ) {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      return;
+    }
     if (account.verificationStatus !== "VERIFIED") return;
     if (account.provider !== "EMAIL") return;
 
@@ -39,9 +46,8 @@ export class PasswordService {
     });
 
     // kirim email
-    `${process.env.WEB_DOMAIN}/reset-password?token=${rawToken}`;
-
-    await emailUtil.sendResetPasswordEmail(account.email, rawToken);
+    const resetUrl = `${process.env.WEB_DOMAIN}/reset-password?token=${rawToken}`;
+    await emailUtil.sendResetPasswordEmail(account.email, resetUrl);
   }
 
   async resetPassword(payload: IResetPasswordPayload) {
@@ -64,6 +70,13 @@ export class PasswordService {
 
     if (record.expiredAt < new Date()) {
       throw new AppError(400, "Reset token expired");
+    }
+
+    if (record.authAccount.provider !== "EMAIL") {
+      throw new AppError(
+        400,
+        "Password reset not allowed for social login accounts",
+      );
     }
 
     const hashedPassword = await bcrypt.hash(payload.newPassword, 10);

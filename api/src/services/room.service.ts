@@ -135,9 +135,20 @@ export class RoomService {
 
     if (!property) throw new AppError(403, "Not allowed");
 
-    return prisma.roomType.findMany({
+    const rooms = await prisma.roomType.findMany({
       where: { propertyId },
       orderBy: { createdAt: "desc" },
     });
+
+    // 🔥 map DB → API response shape
+    return rooms.map((r) => ({
+      id: r.id,
+      name: r.name,
+      price: r.basePrice, // ← mapping penting
+      description: r.description,
+      totalRoom: r.totalRoom,
+      createdAt: r.createdAt,
+      updatedAt: r.updatedAt,
+    }));
   }
 }

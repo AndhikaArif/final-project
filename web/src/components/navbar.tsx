@@ -43,10 +43,7 @@ export default function Navbar() {
       {/* ================= TOP NAVBAR ================= */}
       <nav className="flex justify-between items-center py-4 px-4 md:px-8 w-full bg-gray-950 border-b border-gray-300">
         {/* Logo */}
-        <Link
-          href={isTenant ? "/tenant/dashboard" : "/"}
-          className="text-2xl font-semibold tracking-wide"
-        >
+        <Link href="/" className="text-2xl font-semibold tracking-wide">
           Paparoom
         </Link>
 
@@ -79,9 +76,6 @@ export default function Navbar() {
         {/* Desktop Navigation */}
         <div className="hidden sm:flex items-center gap-8">
           {/* Public */}
-          <Link href="/" className="hover:text-blue-500">
-            Home
-          </Link>
 
           {!isTenant && (
             <Link href="/properties" className="hover:text-blue-500">
@@ -99,9 +93,6 @@ export default function Navbar() {
           {/* Tenant */}
           {isTenant && (
             <>
-              <Link href="/tenant/dashboard" className="hover:text-blue-500">
-                Dashboard
-              </Link>
               <Link href="/tenant/properties" className="hover:text-blue-500">
                 My Properties
               </Link>
@@ -175,12 +166,6 @@ export default function Navbar() {
           {isTenant && (
             <>
               <Link
-                href="/tenant/dashboard"
-                className="text-black hover:scale-101"
-              >
-                Dashboard
-              </Link>
-              <Link
                 href="/tenant/properties"
                 className="text-black hover:scale-101"
               >
@@ -219,7 +204,7 @@ export default function Navbar() {
 
       {/* ================= BOTTOM NAVBAR (MOBILE) ================= */}
       <nav className="fixed bottom-0 h-16 flex justify-around items-center w-full border-t bg-white sm:hidden">
-        <Link href={isTenant ? "/tenant/dashboard" : "/"}>Home</Link>
+        <Link href="/">Home</Link>
 
         {!isTenant && <Link href="/properties">Explore</Link>}
 

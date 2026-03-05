@@ -67,7 +67,7 @@ export class AuthService {
     const rawToken = generateToken();
     const hashedToken = createHash("sha256").update(rawToken).digest("hex");
 
-    const authAccount = await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async (tx) => {
       const account = await tx.authAccount.create({
         data: {
           email: payload.email,
@@ -142,7 +142,7 @@ export class AuthService {
         throw new AppError(403, "Invalid auth provider");
       }
 
-      if (existing && existing.role !== payload.role) {
+      if (existing.role !== payload.role) {
         throw new AppError(403, "Unauthorized role access");
       }
 
@@ -209,17 +209,17 @@ export class AuthService {
       },
     });
 
-    // ❌ belum pernah daftar → harus register social
+    // Belum pernah daftar → kirim flag
     if (!authAccount) {
-      throw new AppError(404, "Account not registered");
+      return {
+        needsRegistration: true,
+      };
     }
 
-    // 🔒 provider check
     if (authAccount.provider !== payload.provider) {
       throw new AppError(403, "Invalid auth provider");
     }
 
-    // 🔒 role check
     if (authAccount.role !== payload.role) {
       throw new AppError(403, "Unauthorized role access");
     }

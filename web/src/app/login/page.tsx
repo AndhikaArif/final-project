@@ -1,21 +1,42 @@
 "use client";
 
 import { Formik, Form, Field, ErrorMessage } from "formik";
-import { toFormikValidationSchema } from "zod-formik-adapter";
-import { loginSchemaFront } from "@/validation/login.validation";
 import axios from "axios";
 import { useRouter } from "next/navigation";
+import { signIn } from "next-auth/react";
+import { useState, useEffect } from "react";
+import toast from "react-hot-toast";
+
+import { toFormikValidationSchema } from "zod-formik-adapter";
+import { loginSchemaFront } from "@/validation/login.validation";
 import { useAuth } from "@/context/auth-context";
 import PasswordField from "@/components/form/passwordField";
-import { useState, useEffect } from "react";
 import LoadingScreen from "@/components/loading-screen";
-import toast from "react-hot-toast";
 
 export default function LoginPage() {
   const router = useRouter();
-  const { refreshUser } = useAuth();
+  const { refreshUser, user, loading } = useAuth();
+
   const [globalError, setGlobalError] = useState<string | null>(null);
-  const { user, loading } = useAuth();
+  const [socialProvider, setSocialProvider] = useState<
+    "google" | "facebook" | null
+  >(null);
+
+  function startSocialLogin(provider: "google" | "facebook") {
+    setSocialProvider(provider);
+  }
+
+  async function confirmSocialLogin(role: "USER" | "TENANT") {
+    if (!socialProvider) return;
+
+    // simpan role dulu
+    localStorage.setItem("social-role", role);
+
+    // redirect ke OAuth
+    await signIn(socialProvider, {
+      callbackUrl: "/login/social-login",
+    });
+  }
 
   useEffect(() => {
     if (localStorage.getItem("session-expired")) {
@@ -38,6 +59,26 @@ export default function LoginPage() {
       <div className="max-w-md mx-auto p-6 border rounded-xl mt-10">
         <h2 className="text-xl font-semibold mb-4">Login</h2>
 
+        {/* SOCIAL BUTTONS */}
+        <div className="flex flex-col gap-2 mb-4">
+          <button
+            type="button"
+            onClick={() => startSocialLogin("google")}
+            className="border p-2 rounded bg-white hover:bg-gray-200 text-black hover:scale-105 transition cursor-pointer"
+          >
+            Continue with Google
+          </button>
+
+          <button
+            type="button"
+            onClick={() => startSocialLogin("facebook")}
+            className="border p-2 rounded bg-white hover:bg-gray-200 text-black hover:scale-105 transition cursor-pointer"
+          >
+            Continue with Facebook
+          </button>
+        </div>
+
+        {/* FORM LOGIN */}
         <Formik
           initialValues={{ email: "", password: "" }}
           validationSchema={toFormikValidationSchema(loginSchemaFront)}
@@ -52,36 +93,28 @@ export default function LoginPage() {
               );
 
               await refreshUser();
-
               router.replace("/");
-
-              return;
             } catch (err: unknown) {
               if (axios.isAxiosError(err)) {
-                // Tidak ada response (Supabase / API down)
                 if (!err.response) {
                   setGlobalError(
-                    "The server is experiencing problems. Please try logging in again in a moment.",
+                    "The server is experiencing problems. Please try again shortly.",
                   );
                   return;
                 }
 
                 const status = err.response.status;
 
-                //  Username / password salah
                 if (status === 400) {
-                  setErrors({
-                    password: "Invalid email or password",
-                  });
+                  setErrors({ password: "Invalid email or password" });
                   return;
                 }
 
                 if (status === 429) {
-                  setGlobalError("Too many request, please try again later");
+                  setGlobalError("Too many requests, try again later");
                   return;
                 }
 
-                //  Server error (Supabase error biasanya 500)
                 if (status >= 500) {
                   setGlobalError(
                     "The service is currently unavailable. Please try again later.",
@@ -90,36 +123,30 @@ export default function LoginPage() {
                 }
               }
 
-              // fallback
               setGlobalError("An error occurred. Please try again.");
             } finally {
               setSubmitting(false);
             }
           }}
         >
-          {({ isSubmitting }) => {
-            if (isSubmitting) {
-              return <LoadingScreen />;
-            }
-            return (
+          {({ isSubmitting }) =>
+            isSubmitting ? (
+              <LoadingScreen />
+            ) : (
               <Form className="flex flex-col gap-4">
-                {/* Error Supabase */}
                 {globalError && (
-                  <div className="bg-red-100 text-red-600 p-2 rounded text-sm mb-3">
+                  <div className="bg-red-100 text-red-600 p-2 rounded text-sm">
                     {globalError}
                   </div>
                 )}
 
-                {/* EMAIL */}
                 <div className="flex flex-col gap-1">
                   <label className="font-medium">Email</label>
-
                   <Field
                     name="email"
                     placeholder="Email"
-                    className={`border p-2 rounded bg-black text-white`}
+                    className="border p-2 rounded bg-black text-white"
                   />
-
                   <ErrorMessage
                     name="email"
                     component="div"
@@ -127,23 +154,17 @@ export default function LoginPage() {
                   />
                 </div>
 
-                {/* PASSWORD */}
                 <PasswordField
                   name="password"
                   label="Password"
-                  className={"bg-black text-white"}
+                  className="bg-black text-white"
                 />
 
                 <button
                   type="submit"
-                  disabled={isSubmitting}
-                  className={`p-2 rounded transition duration-300 cursor-pointer ${
-                    isSubmitting
-                      ? "opacity-50 cursor-not-allowed"
-                      : "hover:scale-110"
-                  } ${"bg-white text-black"}`}
+                  className="p-2 rounded bg-white text-black hover:scale-105 transition cursor-pointer"
                 >
-                  {isSubmitting ? "Processing..." : "Login"}
+                  Login
                 </button>
 
                 <div className="text-sm text-right mt-2">
@@ -156,10 +177,42 @@ export default function LoginPage() {
                   </button>
                 </div>
               </Form>
-            );
-          }}
+            )
+          }
         </Formik>
       </div>
+
+      {/* ROLE MODAL */}
+      {socialProvider && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white text-black p-6 rounded-xl w-[320px]">
+            <h3 className="text-lg font-semibold mb-4">Login as</h3>
+
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={() => confirmSocialLogin("USER")}
+                className="border p-2 rounded hover:bg-gray-100 hover:scale-105 transition cursor-pointer"
+              >
+                User
+              </button>
+
+              <button
+                onClick={() => confirmSocialLogin("TENANT")}
+                className="border p-2 rounded hover:bg-gray-100 hover:scale-105 transition cursor-pointer"
+              >
+                Tenant / Store Owner
+              </button>
+
+              <button
+                onClick={() => setSocialProvider(null)}
+                className="text-sm mt-3 text-gray-500 hover:scale-105 transition cursor-pointer"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

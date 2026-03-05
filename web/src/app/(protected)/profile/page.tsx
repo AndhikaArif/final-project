@@ -343,18 +343,25 @@ export default function ProfilePage() {
                   {isSubmitting ? "Saving..." : "Save Changes"}
                 </button>
 
-                <button
-                  type="button"
-                  onClick={() => router.push("/forgot-password")}
-                  className="border px-4 py-2 rounded hover:scale-105 transition cursor-pointer"
-                >
-                  Reset Password
-                </button>
+                {user.provider === "EMAIL" ? (
+                  <button
+                    type="button"
+                    onClick={() => router.push("/forgot-password")}
+                    className="border px-4 py-2 rounded hover:scale-105 transition cursor-pointer"
+                  >
+                    Reset Password
+                  </button>
+                ) : (
+                  <p className="text-xs text-gray-500 italic">
+                    Password is managed by your social login provider
+                  </p>
+                )}
               </div>
 
               {user.role === "TENANT" && (
                 <div className="my-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <button
+                    type="button"
                     onClick={() => router.push("/tenant/properties")}
                     className="border px-4 py-2 rounded hover:scale-105 transition bg-white text-black cursor-pointer"
                   >
@@ -362,6 +369,7 @@ export default function ProfilePage() {
                   </button>
 
                   <button
+                    type="button"
                     onClick={() => router.push("tenant/categories")}
                     className="border px-4 py-2 rounded hover:scale-105 transition bg-white text-black cursor-pointer"
                   >
