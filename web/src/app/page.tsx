@@ -1,17 +1,23 @@
-import LandingSearch from "@/components/landing-search";
+import HeroCarousel from "@/components/hero-carousel";
+import FeaturedProperties from "@/components/featured-properties";
+import CitiesSection from "@/components/cities-section";
+import Footer from "@/components/footer";
 
 export default function HomePage() {
   return (
-    <div className="max-w-6xl mx-auto px-6 py-12">
+    <div>
       {/* HERO */}
-      <h1 className="text-4xl font-bold mb-4">Find your perfect stay</h1>
+      <HeroCarousel />
+      <div className="mt-24 px-6">
+        <CitiesSection />
 
-      <p className="mb-8">
-        Compare prices, check availability, and book instantly
-      </p>
+        <div className="mt-24">
+          <FeaturedProperties />
+        </div>
 
-      {/* SEARCH FORM */}
-      <LandingSearch />
+        {/* FOOTER */}
+        <Footer />
+      </div>
     </div>
   );
 }

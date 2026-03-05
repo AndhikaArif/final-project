@@ -25,12 +25,25 @@ export class PropertyService {
       limit = 10,
     } = params;
 
-    const skip = (page - 1) * limit;
+    if (checkIn) checkIn.setHours(0, 0, 0, 0);
+    if (checkOut) checkOut.setHours(0, 0, 0, 0);
+
+    if (checkIn && checkOut && checkIn >= checkOut) {
+      throw new AppError(400, "checkOut must be after checkIn");
+    }
 
     const where: Prisma.PropertyWhereInput = {
-      city: { contains: city, mode: "insensitive" },
       isActive: true,
+      roomTypes: {
+        some: {
+          totalRoom: { gt: 0 },
+        },
+      },
     };
+
+    if (city) {
+      where.city = { equals: city, mode: "insensitive" };
+    }
 
     if (search) {
       where.name = { contains: search, mode: "insensitive" };
@@ -40,70 +53,17 @@ export class PropertyService {
       where.categoryId = category;
     }
 
-    if (checkIn >= checkOut) {
-      throw new AppError(400, "checkOut must be after checkIn");
-    }
-
     const properties = await prisma.property.findMany({
       where,
       include: {
         category: true,
         roomTypes: {
           include: {
-            peakSeasonRates: {
-              where: {
-                startDate: { lte: checkOut },
-                endDate: { gte: checkIn },
-              },
-            },
+            peakSeasonRates: true,
           },
         },
       },
-      skip,
-      take: limit,
     });
-
-    // ================================
-    // STEP 1: Ambil semua roomTypeId
-    // ================================
-    const roomTypeIds = properties.flatMap((p) => p.roomTypes.map((r) => r.id));
-
-    // ================================
-    // STEP 2: Query booking SEKALI
-    // ================================
-    const now = new Date();
-
-    const bookedGrouped = await prisma.orderItem.groupBy({
-      by: ["roomTypeId"],
-      where: {
-        roomTypeId: { in: roomTypeIds },
-        order: {
-          OR: [
-            {
-              status: "PAID",
-            },
-            {
-              status: "WAITING_PAYMENT",
-              expiredAt: { gt: now },
-            },
-          ],
-        },
-        checkInDate: { lt: checkOut },
-        checkOutDate: { gt: checkIn },
-      },
-      _sum: {
-        roomQuantity: true,
-      },
-    });
-
-    // ================================
-    // STEP 3: Buat Map
-    // ================================
-    const bookedMap = new Map<string, number>();
-
-    for (const item of bookedGrouped) {
-      bookedMap.set(item.roomTypeId, item._sum.roomQuantity ?? 0);
-    }
 
     const results: {
       id: string;
@@ -118,20 +78,36 @@ export class PropertyService {
       let cheapestPrice: number | null = null;
 
       for (const room of property.roomTypes) {
-        const bookedQty = bookedMap.get(room.id) ?? 0;
-        const available = room.totalRoom - bookedQty;
+        if (room.totalRoom <= 0) continue;
 
-        if (available <= 0) continue;
+        // ======= TANPA TANGGAL → BASE PRICE =======
+        if (!checkIn || !checkOut) {
+          const base = room.basePrice;
+          if (cheapestPrice === null || base < cheapestPrice) {
+            cheapestPrice = base;
+          }
+          continue;
+        }
 
+        // ======= DENGAN TANGGAL → HITUNG RANGE =======
         let totalPrice = 0;
-        let current = new Date(checkIn);
+        let current = new Date(checkIn.getTime());
 
         while (current.getTime() < checkOut.getTime()) {
           let price = room.basePrice;
 
-          const peak = room.peakSeasonRates.find(
-            (r) => current >= r.startDate && current <= r.endDate,
-          );
+          const peak = room.peakSeasonRates.find((r) => {
+            const start = new Date(r.startDate);
+            const end = new Date(r.endDate);
+
+            start.setHours(0, 0, 0, 0);
+            end.setHours(0, 0, 0, 0);
+
+            const compareDate = new Date(current);
+            compareDate.setHours(0, 0, 0, 0);
+
+            return compareDate >= start && compareDate <= end;
+          });
 
           if (peak) {
             price +=
@@ -161,22 +137,32 @@ export class PropertyService {
       }
     }
 
-    // SORT
+    // ================= SORT =================
     if (sort === "price_asc")
       results.sort((a, b) => a.cheapestPrice - b.cheapestPrice);
+
     if (sort === "price_desc")
       results.sort((a, b) => b.cheapestPrice - a.cheapestPrice);
+
     if (sort === "name_desc")
       results.sort((a, b) => b.name.localeCompare(a.name));
+
     if (sort === "name_asc")
       results.sort((a, b) => a.name.localeCompare(b.name));
 
+    // ================= PAGINATION =================
+    const total = results.length;
+    const totalPages = Math.ceil(total / limit);
+    const start = (page - 1) * limit;
+    const paginated = results.slice(start, start + limit);
+
     return {
-      data: results,
+      data: paginated,
       meta: {
-        returned: results.length, // lebih akurat dari count awal
         page,
         limit,
+        total,
+        totalPages,
       },
     };
   }
@@ -202,7 +188,13 @@ export class PropertyService {
 
     if (!property) throw new AppError(404, "Property not found");
 
-    if (checkIn >= checkOut) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const startDate = checkIn ?? today;
+    const endDate = checkOut ?? new Date(today.getTime() + 86400000);
+
+    if (startDate >= endDate) {
       throw new AppError(400, "checkOut must be after checkIn");
     }
 
@@ -211,14 +203,23 @@ export class PropertyService {
     for (const room of property.roomTypes) {
       const prices: Record<string, number> = {};
 
-      let current = new Date(checkIn);
+      let current = new Date(startDate.getTime());
 
-      while (current.getTime() < checkOut.getTime()) {
+      while (current.getTime() < endDate.getTime()) {
         let price = room.basePrice;
 
-        const peak = room.peakSeasonRates.find(
-          (r) => current >= r.startDate && current <= r.endDate,
-        );
+        const peak = room.peakSeasonRates.find((r) => {
+          const start = new Date(r.startDate);
+          const end = new Date(r.endDate);
+
+          start.setHours(0, 0, 0, 0);
+          end.setHours(0, 0, 0, 0);
+
+          const compareDate = new Date(current);
+          compareDate.setHours(0, 0, 0, 0);
+
+          return compareDate >= start && compareDate <= end;
+        });
 
         if (peak) {
           price +=
@@ -227,7 +228,7 @@ export class PropertyService {
               : peak.value;
         }
 
-        const dateKey = current.toLocaleDateString("sv-SE");
+        const dateKey = current.toISOString().slice(0, 10);
         prices[dateKey] = price;
 
         current.setDate(current.getDate() + 1);
@@ -239,6 +240,7 @@ export class PropertyService {
         description: room.description,
         totalRoom: room.totalRoom,
         priceCalendar: prices,
+        available: room.totalRoom > 0,
       });
     }
 
@@ -375,13 +377,21 @@ export class PropertyService {
 
   async getCities() {
     const cities = await prisma.property.findMany({
-      where: { isActive: true },
+      where: {
+        isActive: true,
+        roomTypes: {
+          some: {
+            totalRoom: { gt: 0 },
+          },
+        },
+      },
       select: { city: true },
-      distinct: ["city"],
-      orderBy: { city: "asc" },
     });
 
-    return cities.map((c) => c.city);
+    const normalized = cities.map((c) => c.city.trim().toLowerCase());
+    const unique = [...new Set(normalized)];
+
+    return unique.map((c) => c.charAt(0).toUpperCase() + c.slice(1));
   }
 
   async getPropertyCalendar(propertyId: string) {
@@ -399,6 +409,7 @@ export class PropertyService {
     if (!property) throw new AppError(404, "Property not found");
 
     const today = new Date();
+    today.setHours(0, 0, 0, 0);
     const days: {
       date: string;
       price: number;
@@ -416,9 +427,18 @@ export class PropertyService {
       for (const room of property.roomTypes) {
         let price = room.basePrice;
 
-        const peak = room.peakSeasonRates.find(
-          (r) => current >= r.startDate && current <= r.endDate,
-        );
+        const peak = room.peakSeasonRates.find((r) => {
+          const start = new Date(r.startDate);
+          const end = new Date(r.endDate);
+
+          start.setHours(0, 0, 0, 0);
+          end.setHours(0, 0, 0, 0);
+
+          const compareDate = new Date(current);
+          compareDate.setHours(0, 0, 0, 0);
+
+          return compareDate >= start && compareDate <= end;
+        });
 
         if (peak) {
           isPeak = true;
@@ -438,7 +458,7 @@ export class PropertyService {
           date: current.toISOString().slice(0, 10),
           price: cheapest,
           isPeak,
-          available: true, // nanti bisa kamu upgrade cek availability
+          available: property.roomTypes.some((r) => r.totalRoom > 0),
         });
       }
     }
