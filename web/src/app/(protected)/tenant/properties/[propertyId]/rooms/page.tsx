@@ -91,7 +91,7 @@ export default function RoomsPage() {
             setEditing(null);
             setOpenForm(true);
           }}
-          className="px-4 py-2 bg-black text-white rounded-lg"
+          className="px-4 py-2 bg-black text-white rounded-lg cursor-pointer"
         >
           + Add Room
         </button>

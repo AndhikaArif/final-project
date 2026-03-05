@@ -361,6 +361,7 @@ export default function ProfilePage() {
               {user.role === "TENANT" && (
                 <div className="my-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <button
+                    type="button"
                     onClick={() => router.push("/tenant/properties")}
                     className="border px-4 py-2 rounded hover:scale-105 transition bg-white text-black cursor-pointer"
                   >
@@ -368,6 +369,7 @@ export default function ProfilePage() {
                   </button>
 
                   <button
+                    type="button"
                     onClick={() => router.push("tenant/categories")}
                     className="border px-4 py-2 rounded hover:scale-105 transition bg-white text-black cursor-pointer"
                   >

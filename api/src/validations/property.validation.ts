@@ -23,28 +23,47 @@ export class PropertySchema {
 
   static catalogQuery = z
     .object({
-      city: z.string().min(1, "City is required"),
-      checkIn: z.coerce.date(),
-      checkOut: z.coerce.date(),
+      city: z.string().trim().toLowerCase().min(1).optional(),
 
-      search: z.string().optional(),
+      checkIn: z.coerce.date().optional(),
+      checkOut: z.coerce.date().optional(),
+
+      search: z.string().trim().min(1).optional(),
       category: z.string().optional(),
+
       sort: z
         .enum(["price_asc", "price_desc", "name_asc", "name_desc"])
         .optional(),
 
-      page: z.coerce.number().min(1).optional(),
-      limit: z.coerce.number().min(1).max(100).optional(),
+      page: z.coerce.number().min(1).default(1),
+      limit: z.coerce.number().min(1).max(100).default(10),
     })
-    .refine((data) => data.checkOut > data.checkIn, {
-      message: "checkOut must be after checkIn",
-      path: ["checkOut"],
-    });
+    .refine(
+      (data) => {
+        if (!data.checkIn || !data.checkOut) return true;
+        return data.checkOut > data.checkIn;
+      },
+      {
+        message: "checkOut must be after checkIn",
+        path: ["checkOut"],
+      },
+    );
 
-  static detailQuery = z.object({
-    checkIn: z.coerce.date(),
-    checkOut: z.coerce.date(),
-  });
+  static detailQuery = z
+    .object({
+      checkIn: z.coerce.date().optional(),
+      checkOut: z.coerce.date().optional(),
+    })
+    .refine(
+      (data) => {
+        if (!data.checkIn || !data.checkOut) return true;
+        return data.checkOut > data.checkIn;
+      },
+      {
+        message: "checkOut must be after checkIn",
+        path: ["checkOut"],
+      },
+    );
 
   /* -------------------------------------------------------------------------- */
   /*                              CATEGORY SCHEMAS                              */
@@ -64,7 +83,7 @@ export class PropertySchema {
     name: z.string().min(1),
     description: z.string().min(1),
     address: z.string().min(1),
-    city: z.string().min(1),
+    city: z.string().min(1).trim().toLowerCase(),
     categoryId: z.string().uuid(),
     maxGuest: z.coerce.number().min(1),
   });
