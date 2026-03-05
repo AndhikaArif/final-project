@@ -247,6 +247,10 @@ model Order {
   id     String @id @default(uuid())
   userId String
 
+  firstName    String
+  lastName     String
+  email        String
+  phoneNumber  String
   totalAmount  Float
   status       StatusOrder @default(WAITING_PAYMENT)
   verifiedAt   DateTime?
@@ -288,6 +292,7 @@ model Payment {
 
   order Order @relation(fields: [orderId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
+  @@index([status])
   @@map("payment")
 }
 

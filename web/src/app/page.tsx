@@ -1,3 +1,4 @@
+import LandingSearch from "@/components/landing-search";
 import HeroCarousel from "@/components/hero-carousel";
 import FeaturedProperties from "@/components/featured-properties";
 import CitiesSection from "@/components/cities-section";
@@ -15,6 +16,8 @@ export default function HomePage() {
           <FeaturedProperties />
         </div>
 
+        {/* SEARCH FORM */}
+        <LandingSearch />
         {/* FOOTER */}
         <Footer />
       </div>

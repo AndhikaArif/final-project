@@ -151,4 +151,30 @@ export class RoomService {
       updatedAt: r.updatedAt,
     }));
   }
+
+  async getRoomById(id: string) {
+    const room = await prisma.roomType.findUnique({
+      where: { id },
+      include: {
+        property: true,
+      },
+    });
+
+    if (!room) {
+      throw new AppError(404, "Room not found");
+    }
+
+    // 🔥 map DB → API response shape
+    return {
+      id: room.id,
+      name: room.name,
+      price: room.basePrice,
+      description: room.description,
+      totalRoom: room.totalRoom,
+      propertyId: room.propertyId,
+      property: room.property,
+      createdAt: room.createdAt,
+      updatedAt: room.updatedAt,
+    };
+  }
 }

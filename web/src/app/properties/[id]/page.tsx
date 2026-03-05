@@ -1,6 +1,6 @@
 "use client";
 
-import { useParams, useSearchParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import axios from "axios";
@@ -22,116 +22,211 @@ type PropertyDetail = {
   city: string;
   category: string;
   rooms: Room[];
-  reviews: unknown[];
 };
 
 export default function PropertyDetailPage() {
   const params = useParams();
-  const searchParams = useSearchParams();
-
+  const router = useRouter();
   const id = params.id as string;
-  const checkIn = searchParams.get("checkIn");
-  const checkOut = searchParams.get("checkOut");
+
+  const [checkIn, setCheckIn] = useState("");
+  const [checkOut, setCheckOut] = useState("");
+
+  const [guest, setGuest] = useState(1);
+
+  const [selectedRooms, setSelectedRooms] = useState<Record<string, number>>(
+    {},
+  );
 
   const [property, setProperty] = useState<PropertyDetail | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!id) return;
+    const fetchProperty = async () => {
+      const res = await axios.get(
+        `${process.env.NEXT_PUBLIC_API_DOMAIN}/api/properties/${id}`,
+      );
 
-    const fetchData = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        let url = `${process.env.NEXT_PUBLIC_API_DOMAIN}/api/properties/${id}`;
-
-        if (checkIn && checkOut) {
-          url += `?checkIn=${checkIn}&checkOut=${checkOut}`;
-        }
-
-        const response = await axios.get(url);
-        setProperty(response.data.data);
-      } catch (err: unknown) {
-        console.error(err);
-        if (axios.isAxiosError(err)) {
-          setError(
-            err.response?.data?.message ||
-              err.message ||
-              "Something went wrong",
-          );
-        } else if (err instanceof Error) {
-          setError(err.message);
-        } else {
-          setError("Something went wrong");
-        }
-      } finally {
-        setLoading(false);
-      }
+      setProperty(res.data.data);
+      setLoading(false);
     };
 
-    fetchData();
-  }, [id, checkIn, checkOut]);
+    fetchProperty();
+  }, [id]);
 
-  if (loading) return <p className="p-10 text-white">Loading...</p>;
-  if (error) return <p className="p-10 text-red-500">{error}</p>;
-  if (!property) return null;
+  const updateRoomQty = (roomId: string, qty: number) => {
+    setSelectedRooms((prev) => ({
+      ...prev,
+      [roomId]: qty,
+    }));
+  };
+
+  const handleBook = () => {
+    if (!checkIn || !checkOut) {
+      alert("Select check in and check out date");
+      return;
+    }
+
+    if (guest < 1) {
+      alert("Guest must be at least 1");
+      return;
+    }
+
+    const rooms = Object.entries(selectedRooms)
+      .filter(([_, qty]) => qty > 0)
+      .map(([roomId, qty]) => `${roomId}:${qty}`)
+      .join(",");
+
+    if (!rooms) {
+      alert("Select at least one room");
+      return;
+    }
+
+    router.push(
+      `/order?propertyId=${id}&checkIn=${checkIn}&checkOut=${checkOut}&guest=${guest}&rooms=${rooms}`,
+    );
+  };
+
+  if (loading || !property) return <p className="p-10">Loading...</p>;
+
   const imageSrc =
     property.image ??
     "https://images.unsplash.com/photo-1560185127-6ed189bf02f4";
 
   return (
     <div className="max-w-5xl mx-auto px-6 py-16">
+      {/* IMAGE */}
       <div className="relative h-80 w-full rounded-xl overflow-hidden mb-6">
         <Image
           src={imageSrc}
           alt={property.name}
-          className="object-cover w-full h-full"
           fill
+          className="object-cover"
         />
       </div>
 
+      {/* BOOKING PANEL */}
+      <div className="bg-gray-800 p-4 rounded-xl mb-8 grid md:grid-cols-3 gap-4">
+        {/* CHECKIN */}
+        <div className="flex flex-col">
+          <label className="text-white text-sm mb-1">Check In</label>
+          <input
+            type="date"
+            value={checkIn}
+            onChange={(e) => setCheckIn(e.target.value)}
+            className="p-2 rounded bg-gray-700 text-white"
+          />
+        </div>
+
+        {/* CHECKOUT */}
+        <div className="flex flex-col">
+          <label className="text-white text-sm mb-1">Check Out</label>
+          <input
+            type="date"
+            value={checkOut}
+            onChange={(e) => setCheckOut(e.target.value)}
+            className="p-2 rounded bg-gray-700 text-white"
+          />
+        </div>
+
+        {/* GUEST */}
+        <div className="flex flex-col">
+          <label className="text-white text-sm mb-1">Guest</label>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setGuest(Math.max(guest - 1, 1))}
+              className="bg-gray-600 px-3 py-1 rounded text-white"
+            >
+              -
+            </button>
+
+            <span className="text-white w-8 text-center">{guest}</span>
+
+            <button
+              onClick={() => setGuest(guest + 1)}
+              className="bg-gray-600 px-3 py-1 rounded text-white"
+            >
+              +
+            </button>
+          </div>
+        </div>
+      </div>
+
       <div className="grid md:grid-cols-3 gap-8">
-        {/* Left: Property Info */}
-        <div className="md:col-span-2 space-y-4">
-          <h1 className="text-3xl font-bold text-white">{property.name}</h1>
+        {/* PROPERTY INFO */}
+        <div className="md:col-span-2">
+          <h1 className="text-3xl font-bold text-white mb-4">
+            {property.name}
+          </h1>
+
           <p className="text-gray-300">
             {property.address}, {property.city}
           </p>
-          <p className="text-gray-300">{property.description}</p>
+
+          <p className="text-gray-300 mt-4">{property.description}</p>
         </div>
 
-        {/* Right: Rooms / Booking Panel */}
+        {/* ROOM LIST */}
         <div className="space-y-4">
-          <h2 className="text-xl font-semibold mb-2 text-white">Rooms</h2>
-          {property.rooms.length > 0 ? (
-            property.rooms.map((room: Room) => {
-              const price =
-                checkIn && room.priceCalendar?.[checkIn] != null
-                  ? room.priceCalendar[checkIn]
-                  : room.priceCalendar
-                    ? Object.values(room.priceCalendar)[0]
-                    : null;
+          <h2 className="text-xl text-white font-semibold">Rooms</h2>
 
-              return (
-                <div
-                  key={room.id}
-                  className="border border-gray-700 rounded-xl p-4 hover:shadow-lg transition bg-gray-800"
-                >
-                  <h3 className="font-semibold text-white">{room.name}</h3>
-                  <p className="text-gray-300 mb-2">{room.description}</p>
-                  <p className="font-bold text-blue-400">
-                    {price ? `Rp ${price.toLocaleString()} / night` : "N/A"}
-                  </p>
-                  <button className="mt-4 w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition cursor-pointer">
-                    Book Now
+          {property.rooms.map((room) => {
+            const price =
+              checkIn && room.priceCalendar?.[checkIn]
+                ? room.priceCalendar[checkIn]
+                : Object.values(room.priceCalendar || {})[0];
+
+            return (
+              <div
+                key={room.id}
+                className="border border-gray-700 rounded-xl p-4 bg-gray-800"
+              >
+                <h3 className="font-semibold text-white">{room.name}</h3>
+
+                <p className="text-gray-300 text-sm mb-2">{room.description}</p>
+
+                <p className="text-blue-400 font-bold mb-3">
+                  Rp {price?.toLocaleString()} / night
+                </p>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() =>
+                      updateRoomQty(
+                        room.id,
+                        Math.max((selectedRooms[room.id] || 0) - 1, 0),
+                      )
+                    }
+                    className="bg-gray-600 px-3 rounded text-white"
+                  >
+                    -
+                  </button>
+
+                  <span className="text-white w-6 text-center">
+                    {selectedRooms[room.id] || 0}
+                  </span>
+
+                  <button
+                    onClick={() =>
+                      updateRoomQty(room.id, (selectedRooms[room.id] || 0) + 1)
+                    }
+                    className="bg-gray-600 px-3 rounded text-white"
+                  >
+                    +
                   </button>
                 </div>
-              );
-            })
-          ) : (
-            <p className="text-gray-300">No rooms available.</p>
-          )}
+              </div>
+            );
+          })}
+
+          {/* BOOK BUTTON */}
+          <button
+            onClick={handleBook}
+            className="w-full bg-blue-600 py-3 rounded-xl text-white font-semibold mt-6 hover:bg-blue-700"
+          >
+            Book Selected Rooms
+          </button>
         </div>
       </div>
     </div>

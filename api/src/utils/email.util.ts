@@ -43,4 +43,26 @@ export class EmailUtil {
       html,
     });
   }
+
+  async sendPaymentReminderEmail(
+    email: string,
+    payload: {
+      orderId: string;
+      expiredAt: Date;
+    },
+  ) {
+    const paymentLink = `${process.env.WEB_DOMAIN}/payment/${payload.orderId}`;
+
+    const html = await this.renderTemplate("payment-reminder", {
+      paymentLink,
+      orderId: payload.orderId,
+      expiredAt: payload.expiredAt.toLocaleString(),
+    });
+
+    await sendEmail({
+      to: email,
+      subject: "Payment Reminder",
+      html,
+    });
+  }
 }

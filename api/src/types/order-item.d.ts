@@ -4,3 +4,10 @@ export interface ICreateOrderItem {
   checkInDate: Date;
   checkOutDate: Date;
 }
+
+export interface IOrderContact {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phoneNumber: string;
+}
