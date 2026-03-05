@@ -343,13 +343,19 @@ export default function ProfilePage() {
                   {isSubmitting ? "Saving..." : "Save Changes"}
                 </button>
 
-                <button
-                  type="button"
-                  onClick={() => router.push("/forgot-password")}
-                  className="border px-4 py-2 rounded hover:scale-105 transition cursor-pointer"
-                >
-                  Reset Password
-                </button>
+                {user.provider === "EMAIL" ? (
+                  <button
+                    type="button"
+                    onClick={() => router.push("/forgot-password")}
+                    className="border px-4 py-2 rounded hover:scale-105 transition cursor-pointer"
+                  >
+                    Reset Password
+                  </button>
+                ) : (
+                  <p className="text-xs text-gray-500 italic">
+                    Password is managed by your social login provider
+                  </p>
+                )}
               </div>
 
               {user.role === "TENANT" && (

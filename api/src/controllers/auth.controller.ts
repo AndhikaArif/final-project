@@ -90,6 +90,10 @@ export class AuthController {
 
       const provider = providerMap[auth.provider];
 
+      if (!provider) {
+        throw new AppError(400, "Unsupported provider");
+      }
+
       const result = await authService.registerSocial({
         email: auth.email,
         provider,
@@ -149,6 +153,14 @@ export class AuthController {
         role,
       });
 
+      // Handle needs registrasion dulu
+      if ("needsRegistration" in result) {
+        return res.status(200).json({
+          needsRegistration: true,
+        });
+      }
+
+      // Generate JWT kalau akun sudah ada
       const token = signJwt({
         authAccountId: result.authAccountId,
         role: result.role,
